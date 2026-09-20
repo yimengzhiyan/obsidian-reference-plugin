@@ -46,26 +46,32 @@
 
 ## 1.1 Editor / Placeholder Spike
 
-- [ ] 注册 `Create Smart Reference` command
-- [ ] 获取当前 active Markdown editor
-- [ ] 获取当前 cursor
-- [ ] 生成唯一 placeholder ID
-- [ ] 插入：
+- [x] 注册 `Create Smart Reference` command
+- [x] 获取当前 active Markdown editor
+- [x] 获取当前 cursor
+- [x] 生成唯一 placeholder ID
+- [x] 插入：
 
 ```markdown
 %%smart-ref:<uuid>%%
 ```
 
-- [ ] 保存源文件 path
-- [ ] 保存 placeholder ID
-- [ ] 能重新找到 placeholder
-- [ ] 能替换 placeholder
-- [ ] 能取消并删除 placeholder
+- [x] 保存源文件 path
+- [x] 保存 placeholder ID
+- [x] 能重新找到 placeholder
+- [x] 能替换 placeholder
+- [x] 能取消并删除 placeholder
 
 ### Acceptance Criteria
 
 - [ ] 切换到其他笔记再回来后，仍能找到 placeholder
-- [ ] 不依赖原始 line/column 完成替换
+- [x] 不依赖原始 line/column 完成替换
+
+Spike implementation note:
+
+- Replacement and cancellation are exposed as explicitly experimental commands.
+- The replacement text is hard-coded to `[[Placeholder Target]]`; this spike does not define the final reference workflow or data model.
+- `npm run dev` watch/rebuild was manually validated, but automatic Obsidian plugin reload is not available.
 
 ---
 
