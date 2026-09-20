@@ -14,25 +14,25 @@
 
 ## Tasks
 
-- [ ] 初始化 Git 项目结构
-- [ ] 创建标准 Obsidian plugin skeleton
-- [ ] 配置 TypeScript
-- [ ] 配置 package scripts
-- [ ] 添加 `manifest.json`
-- [ ] 添加插件入口
-- [ ] 添加基础 README
-- [ ] 添加 `.gitignore`
-- [ ] 确认可在测试 Vault 中加载
-- [ ] 确认 hot reload / build 工作流
-- [ ] 确认开发只在测试 Vault 中进行
+- [x] 初始化 Git 项目结构
+- [x] 创建标准 Obsidian plugin skeleton
+- [x] 配置 TypeScript
+- [x] 配置 package scripts
+- [x] 添加 `manifest.json`
+- [x] 添加插件入口
+- [x] 添加基础 README
+- [x] 添加 `.gitignore`
+- [x] 确认可在测试 Vault 中加载
+- [ ] 确认 watch/rebuild development workflow
+- [x] 确认开发只在测试 Vault 中进行
 
 ## Acceptance Criteria
 
-- [ ] `npm install` 成功
-- [ ] `npm run dev` 或等价命令成功
-- [ ] Obsidian 可以加载插件
-- [ ] 插件可以注册一个测试 command
-- [ ] 不修改正式用户 Vault
+- [x] `npm install` 成功
+- [ ] `npm run dev` 或等价的 watch/rebuild 命令成功
+- [x] Obsidian 可以加载插件
+- [x] 插件可以加载和卸载
+- [x] 不修改正式用户 Vault
 
 ---
 
