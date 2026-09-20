@@ -2,11 +2,19 @@
 
 ## 1. Current Phase
 
-**Phase:** Product definition / technical handoff
+**Phase:** Milestone 0 — Repository & Development Setup
 
-**Coding status:** 尚未开始正式编码。
+**Coding status:** Milestone 0 已完成，包括自动化构建验证和测试 Vault 手动验证。
 
 目前已经完成：
+
+- 创建 `codex/bootstrap-plugin` 开发分支；
+- 创建标准 Obsidian Community Plugin skeleton；
+- 配置 TypeScript、esbuild 和 npm scripts；
+- 添加最小插件入口、manifest 和 `.gitignore`；
+- 添加本地构建与测试 Vault 加载说明。
+
+此前已经完成：
 
 - 明确产品核心问题；
 - 明确主要用户流程；
@@ -21,8 +29,6 @@
 
 目前尚未完成：
 
-- 创建 Obsidian plugin 工程；
-- 编写任何正式业务代码；
 - 验证 Obsidian API / CodeMirror API 细节；
 - 验证 Reading View / Live Preview / Source Mode 点击行为；
 - 设计正式 metadata schema；
@@ -30,6 +36,23 @@
 - 编写手动测试清单；
 - 设计插件设置页；
 - 发布流程。
+
+Milestone 0 手动验证已通过：
+
+- 插件出现在 Community plugins 列表中；
+- 在专用测试 Vault 中启用成功；
+- 控制台显示 `Loading Obsidian Reference Plugin`；
+- 禁用成功，控制台显示 `Unloading Obsidian Reference Plugin`；
+- 再次启用成功；
+- 未观察到插件特有错误；
+- 控制台中的 WebGL fallback warnings 与本插件无关。
+
+自动验证状态：
+
+- `npm run typecheck` 通过；
+- `npm run build` 通过，并生成 `main.js`；
+- `git diff --check` 通过；
+- 依赖已安装，`package-lock.json` 已生成。
 
 ---
 
@@ -103,6 +126,8 @@ File
 ---
 
 ## 4. Immediate Next Step
+
+Milestone 0 checkpoint 已提交。下一步可开始 Milestone 1 的技术 Spike；当前没有实现 placeholder、note picker、block ID、精确引用 metadata 或高亮功能。
 
 不要直接开始写完整 UI。
 

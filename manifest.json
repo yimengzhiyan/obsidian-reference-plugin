@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-reference-plugin",
+  "name": "Obsidian Reference Plugin",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "An Obsidian plugin for creating internal references.",
+  "author": "",
+  "isDesktopOnly": false
+}
