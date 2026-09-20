@@ -12,7 +12,7 @@
     "obsidian",
     "obsidian-plugin"
   ],
-  "author": "",
+  "author": "yimengzhiyan",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -14,11 +14,14 @@ npm install
 npm run build
 ```
 
-For local development with automatic rebuilds, run:
+For the local watch/rebuild development workflow, run:
 
 ```bash
 npm run dev
 ```
+
+This watches the source and rebuilds `main.js`; it does not automatically
+reload the plugin inside Obsidian.
 
 The generated `main.js` is intentionally ignored by Git. The checked-in
 source of the plugin is `main.ts` and the build configuration is
