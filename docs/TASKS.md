@@ -72,6 +72,7 @@ Spike implementation note:
 - Replacement and cancellation are exposed as explicitly experimental commands.
 - The replacement text is hard-coded to `[[Placeholder Target]]`; this spike does not define the final reference workflow or data model.
 - `npm run dev` watch/rebuild was manually validated, but automatic Obsidian plugin reload is not available.
+- `npm ci`, `npm run build`, and `git diff --check` pass; `npm run typecheck` currently fails on existing Obsidian API typing/nullability/range errors in `main.ts`.
 
 ---
 

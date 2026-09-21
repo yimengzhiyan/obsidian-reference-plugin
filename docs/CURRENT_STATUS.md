@@ -60,7 +60,9 @@ Milestone 0 手动验证已通过：
 本次 spike 当前验证状态：
 
 - `git diff --check` 通过。
-- `npm run typecheck` 与 `npm run build` 尚未执行成功：当前 Codex shell 环境没有 `npm` / `node`，命令在启动前即失败。
+- `npm ci` 已成功完成。
+- `npm run build` 通过，并生成被 `.gitignore` 忽略的 `main.js`。
+- `npm run typecheck` 未通过：`main.ts` 当前有 13 个 Obsidian API 类型、可空值和编辑器范围参数错误；本次验证未修改实现。
 - 尚未在 Obsidian 测试 Vault 中验证命令交互；因此“切换到其他笔记再回来后仍能找到 placeholder”仍保持未勾选。
 
 ---
@@ -146,7 +148,7 @@ Milestone 0 checkpoint 已提交。当前正在进行 Milestone 1 的第一个�
 
 本 spike 不实现 note picker、引用粒度、精确文本选择、block ID、metadata persistence、点击拦截或高亮。
 
-本 checkpoint 已提交为 `ab21ee6` 并推送到 `origin/codex/placeholder-editor-spike`。下一步是在具备 Node/npm 的开发环境中运行 typecheck/build，并在专用测试 Vault 中验证插入、切换返回、替换和取消流程。
+本 checkpoint 已提交为 `b3a022e` 并推送到 `origin/codex/placeholder-editor-spike`。当前下一步是在专用测试 Vault 中验证插入、切换返回、替换和取消流程；typecheck 错误需在后续单独修复。
 
 不要直接开始写完整 UI。
 
