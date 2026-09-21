@@ -2,7 +2,7 @@
 
 ## 1. Current Phase
 
-**Phase:** Milestone 0 — Repository & Development Setup
+**Phase:** Milestone 1 — Placeholder Editor Spike
 
 **Coding status:** Milestone 0 已完成，包括自动化构建验证和测试 Vault 手动验证。
 
@@ -13,6 +13,8 @@
 - 配置 TypeScript、esbuild 和 npm scripts；
 - 添加最小插件入口、manifest 和 `.gitignore`；
 - 添加本地构建与测试 Vault 加载说明。
+- 已确认 `npm run dev` 会启动 esbuild watch mode，修改 `main.ts` 会触发重建；该流程不会自动重新加载 Obsidian 插件。
+- 已创建 `codex/placeholder-editor-spike` 分支并开始 Milestone 1 的 placeholder/editor 技术 spike。
 
 此前已经完成：
 
@@ -36,6 +38,7 @@
 - 编写手动测试清单；
 - 设计插件设置页；
 - 发布流程。
+- Pending operation metadata 与跨笔记取消流程。
 
 Milestone 0 手动验证已通过：
 
@@ -53,6 +56,23 @@ Milestone 0 手动验证已通过：
 - `npm run build` 通过，并生成 `main.js`；
 - `git diff --check` 通过；
 - 依赖已安装，`package-lock.json` 已生成。
+
+本次 spike 当前验证状态：
+
+- `git diff --check` 通过。
+- `npm ci` 已成功完成。
+- `npm run build` 通过，并生成被 `.gitignore` 忽略的 `main.js`。
+- `npm run typecheck` 通过，当前无 TypeScript 错误。
+- 已修复 placeholder/editor spike 的 Obsidian API 类型、可空值、TFile narrowing 和 EditorPosition 使用问题。
+- 已增加缺失 placeholder 与重复 placeholder 的安全拒绝处理；未扩展到后续引用功能。
+
+Placeholder Spike v1 手动验证已完成：
+
+- 成功：源笔记中可以插入带唯一 ID 的 placeholder；
+- 成功：跨笔记流程可以找到并替换源笔记中的 placeholder；
+- 失败：当前硬编码的 `[[Placeholder Target]]` 会被 Obsidian 解析为未解析的 WikiLink，并尝试创建新文件；placeholder 不包含真实 target 信息；
+- 失败：离开源笔记后执行取消命令没有删除 placeholder，说明 pending operation 不能依赖 active editor state；
+- 结论：placeholder 是源笔记锚点，不是完整操作状态；需要持久化 pending operation metadata，并让取消从该状态解析 source note。
 
 ---
 
@@ -127,7 +147,17 @@ File
 
 ## 4. Immediate Next Step
 
-Milestone 0 checkpoint 已提交。下一步可开始 Milestone 1 的技术 Spike；当前没有实现 placeholder、note picker、block ID、精确引用 metadata 或高亮功能。
+Milestone 0 checkpoint 已提交。当前正在进行 Milestone 1 的第一个技术 spike：只验证 source-note placeholder 的插入、跨笔记后按稳定 ID 查找、替换与取消。
+
+本次开发流程验证记录：
+
+- `npm run dev`：已由用户手动验证可启动 esbuild watch mode。
+- 修改 `main.ts`：已由用户手动验证会触发重建。
+- Obsidian 自动 reload：已确认不提供，测试时需要手动重新加载插件或重启测试 Vault。
+
+本 spike 不实现 note picker、引用粒度、精确文本选择、block ID、metadata persistence、点击拦截或高亮。
+
+Placeholder Spike v1 的代码与手动验证已完成并记录失败假设。下一步是 Pending Operation State Spike：验证持久化 pending state、真实 note target、跨笔记替换和跨笔记取消；在此之前不进入完整 note picker 或精确引用流程。
 
 不要直接开始写完整 UI。
 

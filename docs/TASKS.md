@@ -44,32 +44,68 @@
 
 ---
 
-## 1.1 Editor / Placeholder Spike
+## 1.1 Placeholder Spike v1 — Completed Validation
 
-- [ ] 注册 `Create Smart Reference` command
-- [ ] 获取当前 active Markdown editor
-- [ ] 获取当前 cursor
-- [ ] 生成唯一 placeholder ID
-- [ ] 插入：
+**Status:** Completed as a validation spike. Findings invalidate the assumption that the placeholder alone can represent the pending operation or produce the final target link.
+
+- [x] 注册 `Create Smart Reference` command
+- [x] 获取当前 active Markdown editor
+- [x] 获取当前 cursor
+- [x] 生成唯一 placeholder ID
+- [x] 插入：
 
 ```markdown
 %%smart-ref:<uuid>%%
 ```
 
-- [ ] 保存源文件 path
-- [ ] 保存 placeholder ID
-- [ ] 能重新找到 placeholder
-- [ ] 能替换 placeholder
-- [ ] 能取消并删除 placeholder
+- [x] 保存源文件 path
+- [x] 保存 placeholder ID
+- [x] 能重新找到 placeholder
+- [x] 能替换 placeholder
+- [ ] 能取消并删除 placeholder after switching away from the source note
 
 ### Acceptance Criteria
 
-- [ ] 切换到其他笔记再回来后，仍能找到 placeholder
-- [ ] 不依赖原始 line/column 完成替换
+- [x] 切换到其他笔记再回来后，仍能找到 placeholder for replacement
+- [x] 不依赖原始 line/column 完成替换
+
+Spike implementation note:
+
+- Replacement and cancellation are exposed as explicitly experimental commands.
+- The replacement text is hard-coded to `[[Placeholder Target]]`; this spike does not define the final reference workflow or data model.
+- `npm run dev` watch/rebuild was manually validated, but automatic Obsidian plugin reload is not available.
+- `npm ci`, `npm run typecheck`, `npm run build`, and `git diff --check` pass after the correctness pass.
+- The implementation validates the active Markdown file, narrows vault lookups to `TFile`, converts text offsets to `EditorPosition`, and refuses to mutate missing or duplicate placeholders.
+- Manual validation found that the hard-coded `[[Placeholder Target]]` is unresolved and that cancellation after leaving the source note has no effect.
 
 ---
 
-## 1.2 Target Note Picker Spike
+## 1.2 Pending Operation State Spike
+
+### Goal
+
+验证 placeholder 作为 source anchor、持久化 pending operation metadata、真实 note target 和跨笔记取消之间的最小闭环。
+
+### Scope
+
+- [ ] Persist operation ID, source path, placeholder token, operation state, and selected target path.
+- [ ] Select one existing Markdown note as a temporary target.
+- [ ] Generate a real native WikiLink from the selected target.
+- [ ] Replace the source placeholder after switching notes.
+- [ ] Cancel after switching notes, with the source note open but inactive and fully closed.
+- [ ] Clear pending state only after replacement or cancellation succeeds.
+- [ ] Refuse mutation when the placeholder is missing or duplicated.
+
+### Non-goals
+
+- [ ] Target note picker UX
+- [ ] Heading/block/precise-text selection
+- [ ] Block ID generation
+- [ ] Precise metadata or highlighting
+
+---
+
+## 1.3 Target Note Picker Spike
 
 - [ ] 读取 Vault 中 Markdown 文件
 - [ ] 实现搜索框
@@ -85,7 +121,7 @@
 
 ---
 
-## 1.3 Exact Selection Capture Spike
+## 1.4 Exact Selection Capture Spike
 
 - [ ] 进入“精确选择模式”
 - [ ] 显示选择状态提示
@@ -106,7 +142,7 @@
 
 ---
 
-## 1.4 Block Identification / Creation Spike
+## 1.5 Block Identification / Creation Spike
 
 - [ ] 确定当前 selection 所在 Markdown block
 - [ ] 检测 block 是否已有 `^block-id`
@@ -123,7 +159,7 @@
 
 ---
 
-## 1.5 Precise Highlight Spike
+## 1.6 Precise Highlight Spike
 
 - [ ] 给定 target file + block ID 打开目标
 - [ ] 滚动到 block
