@@ -483,3 +483,27 @@ V1 至少要设计：
 ```
 
 只要这个闭环稳定，比先堆设置项或辅助功能更重要。
+
+## D-025 — Placeholder 只是源笔记锚点，不是完整的引用状态
+
+**Status:** Confirmed by Placeholder Spike v1
+
+Placeholder 的职责是标记源笔记中最终需要替换的位置。它本身不能表达完整的引用操作，也不能独立生成可解析的最终链接。
+
+因此，跨笔记流程必须为 pending operation 保存持久化元数据，至少包括：
+
+- operation ID / placeholder ID；
+- source note path；
+- 当前操作状态；
+- 已选择的 target note（如已选择）；
+- 后续需要生成的 replacement 信息。
+
+原因：
+
+- Spike v1 中的 `[[Placeholder Target]]` 会被 Obsidian 当作真实 WikiLink，并尝试打开一个不存在的新文件；
+- 这证明 placeholder 不能承担 target resolution 或最终引用生成职责；
+- 取消操作必须从持久化 pending state 找回 source note 和 placeholder，而不能依赖当前 active editor。
+
+取消流程应在删除 placeholder 成功后才清理 pending state；source note 不在当前 active view、尚未打开或插件重新加载后，仍应能安全解析并取消。
+
+最终输出仍应使用原生 Obsidian WikiLink 作为基础表示；精确引用需要的额外 metadata 可以通过插件自己的持久化数据和隐藏 reference marker 关联，但不能用插件私有协议替代原生链接。

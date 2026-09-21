@@ -38,7 +38,7 @@
 - 编写手动测试清单；
 - 设计插件设置页；
 - 发布流程。
-- placeholder/editor spike 的代码验证与构建验证。
+- Pending operation metadata 与跨笔记取消流程。
 
 Milestone 0 手动验证已通过：
 
@@ -65,7 +65,14 @@ Milestone 0 手动验证已通过：
 - `npm run typecheck` 通过，当前无 TypeScript 错误。
 - 已修复 placeholder/editor spike 的 Obsidian API 类型、可空值、TFile narrowing 和 EditorPosition 使用问题。
 - 已增加缺失 placeholder 与重复 placeholder 的安全拒绝处理；未扩展到后续引用功能。
-- 尚未在 Obsidian 测试 Vault 中验证命令交互；因此“切换到其他笔记再回来后仍能找到 placeholder”仍保持未勾选。
+
+Placeholder Spike v1 手动验证已完成：
+
+- 成功：源笔记中可以插入带唯一 ID 的 placeholder；
+- 成功：跨笔记流程可以找到并替换源笔记中的 placeholder；
+- 失败：当前硬编码的 `[[Placeholder Target]]` 会被 Obsidian 解析为未解析的 WikiLink，并尝试创建新文件；placeholder 不包含真实 target 信息；
+- 失败：离开源笔记后执行取消命令没有删除 placeholder，说明 pending operation 不能依赖 active editor state；
+- 结论：placeholder 是源笔记锚点，不是完整操作状态；需要持久化 pending operation metadata，并让取消从该状态解析 source note。
 
 ---
 
@@ -150,7 +157,7 @@ Milestone 0 checkpoint 已提交。当前正在进行 Milestone 1 的第一个�
 
 本 spike 不实现 note picker、引用粒度、精确文本选择、block ID、metadata persistence、点击拦截或高亮。
 
-本 checkpoint 已提交为 `b3a022e`；本次 correctness pass 将以新的普通 commit 提交并推送到 `origin/codex/placeholder-editor-spike`。当前下一步是在专用测试 Vault 中验证插入、切换返回、替换和取消流程。
+Placeholder Spike v1 的代码与手动验证已完成并记录失败假设。下一步是 Pending Operation State Spike：验证持久化 pending state、真实 note target、跨笔记替换和跨笔记取消；在此之前不进入完整 note picker 或精确引用流程。
 
 不要直接开始写完整 UI。
 
