@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
+import { Editor, MarkdownFileInfo, MarkdownView, Notice, Plugin, TFile } from "obsidian";
 
 interface PlaceholderSession {
   id: string;
@@ -43,14 +43,23 @@ export default class ReferencePlugin extends Plugin {
     console.log("Unloading Obsidian Reference Plugin");
   }
 
-  private createPlaceholder(editor: Editor, view: MarkdownView): void {
+  private createPlaceholder(
+    editor: Editor,
+    view: MarkdownView | MarkdownFileInfo,
+  ): void {
+    const file = view.file;
+    if (!file) {
+      new Notice("Smart Reference placeholder requires an active Markdown file.");
+      return;
+    }
+
     const id = crypto.randomUUID();
     const placeholder = `${PLACEHOLDER_PREFIX}${id}${PLACEHOLDER_SUFFIX}`;
 
     editor.replaceRange(placeholder, editor.getCursor());
-    this.placeholderSession = { id, sourcePath: view.file.path };
+    this.placeholderSession = { id, sourcePath: file.path };
 
-    new Notice(`Smart Reference placeholder inserted in ${view.file.path}`);
+    new Notice(`Smart Reference placeholder inserted in ${file.path}`);
   }
 
   private async replacePlaceholder(): Promise<void> {
@@ -64,32 +73,40 @@ export default class ReferencePlugin extends Plugin {
     const replacement = "[[Placeholder Target]]";
     const sourceView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (sourceView?.file.path === session.sourcePath) {
+    const sourceFile = sourceView?.file;
+
+    if (sourceView && sourceFile?.path === session.sourcePath) {
       const editor = sourceView.editor;
-      const range = findTextRange(editor.getValue(), placeholder);
-      if (!range) {
-        new Notice("Smart Reference placeholder was not found.");
+      const result = findUniqueTextRange(editor.getValue(), placeholder);
+      if (result.kind !== "unique") {
+        showSearchFailureNotice(result.kind);
         return;
       }
 
-      editor.replaceRange(replacement, range.from, range.to);
+      editor.replaceRange(
+        replacement,
+        editor.offsetToPos(result.range.from),
+        editor.offsetToPos(result.range.to),
+      );
     } else {
       const file = this.app.vault.getAbstractFileByPath(session.sourcePath);
-      if (!file || !("extension" in file)) {
+      if (!(file instanceof TFile)) {
         new Notice(`Source note not found: ${session.sourcePath}`);
         return;
       }
 
       const content = await this.app.vault.read(file);
-      const range = findTextRange(content, placeholder);
-      if (!range) {
-        new Notice("Smart Reference placeholder was not found.");
+      const result = findUniqueTextRange(content, placeholder);
+      if (result.kind !== "unique") {
+        showSearchFailureNotice(result.kind);
         return;
       }
 
       await this.app.vault.modify(
         file,
-        content.slice(0, range.from) + replacement + content.slice(range.to),
+        content.slice(0, result.range.from) +
+          replacement +
+          content.slice(result.range.to),
       );
     }
 
@@ -107,23 +124,44 @@ export default class ReferencePlugin extends Plugin {
     const placeholder = `${PLACEHOLDER_PREFIX}${session.id}${PLACEHOLDER_SUFFIX}`;
     const sourceView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-    if (sourceView?.file.path === session.sourcePath) {
+    const sourceFile = sourceView?.file;
+
+    if (sourceView && sourceFile?.path === session.sourcePath) {
       const editor = sourceView.editor;
-      const range = findTextRange(editor.getValue(), placeholder);
-      if (range) {
-        editor.replaceRange("", range.from, range.to);
+      const result = findUniqueTextRange(editor.getValue(), placeholder);
+      if (result.kind === "unique") {
+        editor.replaceRange(
+          "",
+          editor.offsetToPos(result.range.from),
+          editor.offsetToPos(result.range.to),
+        );
+      } else if (result.kind === "not-found") {
+        new Notice("Smart Reference placeholder was not found.");
+        return;
+      } else {
+        showSearchFailureNotice(result.kind);
+        return;
       }
     } else {
       const file = this.app.vault.getAbstractFileByPath(session.sourcePath);
-      if (file && "extension" in file) {
+      if (file instanceof TFile) {
         const content = await this.app.vault.read(file);
-        const range = findTextRange(content, placeholder);
-        if (range) {
+        const result = findUniqueTextRange(content, placeholder);
+        if (result.kind === "unique") {
           await this.app.vault.modify(
             file,
-            content.slice(0, range.from) + content.slice(range.to),
+            content.slice(0, result.range.from) + content.slice(result.range.to),
           );
+        } else if (result.kind === "not-found") {
+          new Notice("Smart Reference placeholder was not found.");
+          return;
+        } else {
+          showSearchFailureNotice(result.kind);
+          return;
         }
+      } else {
+        new Notice(`Source note not found: ${session.sourcePath}`);
+        return;
       }
     }
 
@@ -137,7 +175,44 @@ interface TextRange {
   to: number;
 }
 
-function findTextRange(content: string, text: string): TextRange | null {
-  const from = content.indexOf(text);
-  return from === -1 ? null : { from, to: from + text.length };
+type TextRangeSearchResult =
+  | { kind: "not-found" }
+  | { kind: "multiple"; count: number }
+  | { kind: "unique"; range: TextRange };
+
+function findUniqueTextRange(
+  content: string,
+  text: string,
+): TextRangeSearchResult {
+  const ranges: TextRange[] = [];
+  let searchFrom = 0;
+
+  while (searchFrom < content.length) {
+    const from = content.indexOf(text, searchFrom);
+    if (from === -1) {
+      break;
+    }
+
+    ranges.push({ from, to: from + text.length });
+    searchFrom = from + text.length;
+  }
+
+  if (ranges.length === 0) {
+    return { kind: "not-found" };
+  }
+
+  if (ranges.length > 1) {
+    return { kind: "multiple", count: ranges.length };
+  }
+
+  return { kind: "unique", range: ranges[0] };
+}
+
+function showSearchFailureNotice(kind: "not-found" | "multiple"): void {
+  if (kind === "multiple") {
+    new Notice("Multiple Smart Reference placeholders were found; no change made.");
+    return;
+  }
+
+  new Notice("Smart Reference placeholder was not found.");
 }
