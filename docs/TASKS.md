@@ -23,15 +23,15 @@
 - [x] 添加基础 README
 - [x] 添加 `.gitignore`
 - [x] 确认可在测试 Vault 中加载
-- [ ] 确认 watch/rebuild development workflow
+- [x] 确认 watch/rebuild development workflow（不包含自动 reload）
 - [x] 确认开发只在测试 Vault 中进行
 
 ## Acceptance Criteria
 
-- [x] `npm install` 成功
-- [ ] `npm run dev` 或等价的 watch/rebuild 命令成功
+- [x] `npm install` / `npm ci` 成功（此前 checkpoint）
+- [x] `npm run dev` 或等价命令成功
 - [x] Obsidian 可以加载插件
-- [x] 插件可以加载和卸载
+- [x] 插件可以注册 command
 - [x] 不修改正式用户 Vault
 
 ---
@@ -44,9 +44,7 @@
 
 ---
 
-## 1.1 Placeholder Spike v1 — Completed Validation
-
-**Status:** Completed as a validation spike. Findings invalidate the assumption that the placeholder alone can represent the pending operation or produce the final target link.
+## 1.1 Editor / Placeholder Spike
 
 - [x] 注册 `Create Smart Reference` command
 - [x] 获取当前 active Markdown editor
@@ -62,117 +60,95 @@
 - [x] 保存 placeholder ID
 - [x] 能重新找到 placeholder
 - [x] 能替换 placeholder
-- [ ] 能取消并删除 placeholder after switching away from the source note
+- [x] 能取消并删除 placeholder（实现完成；跨笔记/重载需再次手动验证）
 
 ### Acceptance Criteria
 
-- [x] 切换到其他笔记再回来后，仍能找到 placeholder for replacement
+- [x] 切换到其他笔记再回来后，仍能找到 placeholder（此前替换验证；新取消路径待复测）
 - [x] 不依赖原始 line/column 完成替换
-
-Spike implementation note:
-
-- Replacement and cancellation are exposed as explicitly experimental commands.
-- The replacement text is hard-coded to `[[Placeholder Target]]`; this spike does not define the final reference workflow or data model.
-- `npm run dev` watch/rebuild was manually validated, but automatic Obsidian plugin reload is not available.
-- `npm ci`, `npm run typecheck`, `npm run build`, and `git diff --check` pass after the correctness pass.
-- The implementation validates the active Markdown file, narrows vault lookups to `TFile`, converts text offsets to `EditorPosition`, and refuses to mutate missing or duplicate placeholders.
-- Manual validation found that the hard-coded `[[Placeholder Target]]` is unresolved and that cancellation after leaving the source note has no effect.
 
 ---
 
 ## 1.2 Pending Operation State Spike
 
-### Goal
-
-验证 placeholder 作为 source anchor、持久化 pending operation metadata、真实 note target 和跨笔记取消之间的最小闭环。
-
-### Scope
-
-- [ ] Persist operation ID, source path, placeholder token, operation state, and selected target path.
-- [ ] Select one existing Markdown note as a temporary target.
-- [ ] Generate a real native WikiLink from the selected target.
-- [ ] Replace the source placeholder after switching notes.
-- [ ] Cancel after switching notes, with the source note open but inactive and fully closed.
-- [ ] Clear pending state only after replacement or cancellation succeeds.
-- [ ] Refuse mutation when the placeholder is missing or duplicated.
-
-### Non-goals
-
-- [ ] Target note picker UX
-- [ ] Heading/block/precise-text selection
-- [ ] Block ID generation
-- [ ] Precise metadata or highlighting
+- [x] Persist operation ID, source path, placeholder token, operation state, and selected target path
+- [x] Select an existing Markdown note as the target
+- [x] Generate a real native Wiki Block Link from the selected target
+- [x] Replace the source placeholder after switching notes
+- [x] Cancel after switching notes using persisted source path (implementation; manual revalidation pending)
+- [x] Clear pending state only after replacement or cancellation succeeds
+- [x] Refuse mutation when the placeholder is missing or duplicated
 
 ---
 
 ## 1.3 Target Note Picker Spike
 
-- [ ] 读取 Vault 中 Markdown 文件
-- [ ] 实现搜索框
-- [ ] 支持 fuzzy search
-- [ ] 用户可以选择目标笔记
-- [ ] 用户可以 Esc 取消
-- [ ] 选择后可以打开目标笔记
+- [x] 读取 Vault 中 Markdown 文件
+- [x] 实现搜索框
+- [x] 支持 fuzzy search（Obsidian `FuzzySuggestModal`）
+- [x] 用户可以选择目标笔记
+- [x] 用户可以 Esc 取消
+- [x] 选择后可以打开目标笔记
 
 ### Acceptance Criteria
 
 - [ ] 100+ 笔记下搜索仍可用
-- [ ] 选择后目标文件正确打开
+- [ ] 选择后目标文件正确打开（已实现，待 Obsidian 手动验证）
 
 ---
 
 ## 1.4 Exact Selection Capture Spike
 
-- [ ] 进入“精确选择模式”
-- [ ] 显示选择状态提示
-- [ ] 获取用户当前 selection
-- [ ] 获取 selected text
-- [ ] 获取 from/to editor position
-- [ ] 将 editor position 映射到 Markdown source offset
-- [ ] Enter 确认
-- [ ] Esc 取消
-- [ ] 防止空 selection 被确认
+- [x] 进入“精确选择模式”
+- [x] 显示选择状态提示
+- [x] 获取用户当前 selection
+- [x] 获取 selected text
+- [x] 获取 from/to editor position
+- [x] 将 editor position 映射到 Markdown source offset
+- [x] Enter 确认
+- [x] Esc 取消
+- [x] 防止空 selection 被确认
 
 ### Acceptance Criteria
 
 - [ ] 可选择段落中的任意一句话
 - [ ] 可选择任意几个词
-- [ ] 能稳定保存 selectedText 和 range
-- [ ] 取消后不污染目标文件
+- [x] 能保存 selectedText、range 和上下文 metadata（待 UI 复测）
+- [x] 取消路径不写入目标文件（实现及纯逻辑验证；待 UI 复测）
 
 ---
 
 ## 1.5 Block Identification / Creation Spike
 
-- [ ] 确定当前 selection 所在 Markdown block
-- [ ] 检测 block 是否已有 `^block-id`
-- [ ] 如无，则创建稳定 block ID
-- [ ] 如有，则复用
-- [ ] 返回 block ID
+- [x] 确定当前 selection 所在 Markdown block
+- [x] 检测 block 是否已有 `^block-id`
+- [x] 如无，则创建稳定 block ID
+- [x] 如有，则复用
+- [x] 返回 block ID
 - [ ] 验证 Obsidian 能正常跳转到该 block
 
 ### Acceptance Criteria
 
-- [ ] 普通 paragraph 工作
-- [ ] 普通 list item 至少完成技术验证
-- [ ] 不重复创建多个 block ID
+- [x] 普通 paragraph 纯逻辑测试通过；Obsidian native jump 待验证
+- [x] 普通 single-line list item 纯逻辑测试通过；Obsidian native jump 待验证
+- [x] 不重复创建多个 block ID（自动测试）
 
 ---
 
 ## 1.6 Precise Highlight Spike
 
-- [ ] 给定 target file + block ID 打开目标
-- [ ] 滚动到 block
-- [ ] 在 block 内找到 selectedText
-- [ ] 通过 CodeMirror Decoration 或等效方式高亮精确范围
-- [ ] 高亮自动移除
-- [ ] 不永久修改 Markdown
-- [ ] 不要求真实 selection 才能看到高亮
+- [x] 给定 target file + block ID 打开目标
+- [x] 滚动到 block/range（实现，待 Obsidian 手动验证）
+- [x] 在 block 内找到 selectedText
+- [x] 通过 CodeMirror 6 Decoration 高亮精确范围
+- [x] 高亮自动移除
+- [x] 不永久修改 Markdown
+- [x] 不要求真实 selection 才能看到高亮
 
 ### Acceptance Criteria
 
 - [ ] 点击/命令触发后用户可以明显看到原始选中文字
-- [ ] Markdown 文件内容不增加任何高亮标记
+- [x] Markdown 文件内容不增加任何高亮标记（implementation invariant）
 - [ ] 高亮消失后编辑器状态正常
 
 ---

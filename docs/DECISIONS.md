@@ -484,26 +484,65 @@ V1 至少要设计：
 
 只要这个闭环稳定，比先堆设置项或辅助功能更重要。
 
+---
+
 ## D-025 — Placeholder 只是源笔记锚点，不是完整的引用状态
 
 **Status:** Confirmed by Placeholder Spike v1
 
-Placeholder 的职责是标记源笔记中最终需要替换的位置。它本身不能表达完整的引用操作，也不能独立生成可解析的最终链接。
+Placeholder 只标记源笔记中的替换位置。跨笔记操作必须另外持久化
+operation ID、source path、placeholder token、流程状态和已选 target。
 
-因此，跨笔记流程必须为 pending operation 保存持久化元数据，至少包括：
+原因：placeholder 本身不能解析真实 target；取消与完成也不能依赖当前
+active editor。只有成功替换或删除 placeholder 后才清理 pending state。
 
-- operation ID / placeholder ID；
-- source note path；
-- 当前操作状态；
-- 已选择的 target note（如已选择）；
-- 后续需要生成的 replacement 信息。
+---
 
-原因：
+## D-026 — Milestone 1 使用 Obsidian 原生 FuzzySuggestModal
 
-- Spike v1 中的 `[[Placeholder Target]]` 会被 Obsidian 当作真实 WikiLink，并尝试打开一个不存在的新文件；
-- 这证明 placeholder 不能承担 target resolution 或最终引用生成职责；
-- 取消操作必须从持久化 pending state 找回 source note 和 placeholder，而不能依赖当前 active editor。
+**Status:** Confirmed by implementation; UX performance needs manual validation
 
-取消流程应在删除 placeholder 成功后才清理 pending state；source note 不在当前 active view、尚未打开或插件重新加载后，仍应能安全解析并取消。
+目标笔记选择使用 `FuzzySuggestModal<TFile>`，数据来自
+`vault.getMarkdownFiles()`。这提供 Obsidian 原生 fuzzy filtering、键盘选择和
+Esc 关闭语义，无需为技术 spike 引入自定义搜索组件。
 
-最终输出仍应使用原生 Obsidian WikiLink 作为基础表示；精确引用需要的额外 metadata 可以通过插件自己的持久化数据和隐藏 reference marker 关联，但不能用插件私有协议替代原生链接。
+选择 target 后，将 target path 写入 pending state，再通过 Workspace leaf 打开。
+关闭 modal 而未选择时，执行统一 cancellation 并回收 source placeholder。
+
+---
+
+## D-027 — 编辑视图高亮使用注册的 CM6 StateField；Reading View 单独处理
+
+**Status:** Editing-view implementation confirmed; runtime compatibility and Reading View pending
+
+临时高亮实现为注册到 Obsidian editor 的 CodeMirror 6 `StateField` 和
+`Decoration.mark`，通过 effect 设置/清除范围，四秒后自动移除。Markdown
+只因合法 block ID 而改变，不写入任何高亮标记，也不使用真实 selection。
+
+当前 Obsidian 公共 API 可以注册 editor extension，但没有公开从 `Editor`
+dispatch 自定义 effect 的完整桥接。本 spike 使用 CodeMirror-backed Editor
+运行时的 `cm` property；这是一项需要在目标 Obsidian 版本持续验证的兼容风险。
+
+Reading View 不运行 CodeMirror，因此必须在后续 click-handling milestone 使用
+单独的 DOM range / rendered-view highlighting layer。原生 Wiki Block Link 仍是
+Reading View 和插件禁用时的 fallback。
+
+---
+
+## D-028 — Spike metadata 存入 data.json，Markdown 保留 native link + ref marker
+
+**Status:** Provisional implementation decision for Milestone 1
+
+当前精确引用输出保持：
+
+```markdown
+[[path/to/Note#^block-id|Alias]] %%ref:<ref-id>%%
+```
+
+详细定位 metadata 通过 Obsidian `loadData` / `saveData` 存入插件 `data.json`，
+包括 target file、block ID、selected text、absolute offsets、prefix 和 suffix。
+
+这已验证数据模型能够表达 offset validation、exact search、context
+disambiguation 和 block fallback，但尚未确认 hidden marker 与 rendered link 的
+最终 click association，也未建立 schema version/migration。因此该存储选择在
+Milestone 2 正式 data model 前仍为 provisional，不改变渐进增强原则。
