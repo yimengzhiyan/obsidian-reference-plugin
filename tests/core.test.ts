@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ensureBlockId, findBlockById, findContainingBlock } from "../src/blocks.ts";
 import { locateReference } from "../src/locator.ts";
+import { findSmartReferenceAtOffset, parseSmartReferenceLinks } from "../src/links.ts";
 import type { PreciseReference } from "../src/model.ts";
+import { resolveReferenceById } from "../src/reference-store.ts";
 import { findUniqueTextRange } from "../src/text-ranges.ts";
 
 test("placeholder lookup requires exactly one token", () => {
@@ -66,6 +68,35 @@ test("locator uses context for duplicate text and otherwise falls back safely", 
   const ambiguous = content.replace("Prefix ", "Wrong ").replace(" suffix", " x.");
   assert.equal(locateReference(ambiguous, reference).kind, "block-only");
   assert.equal(findBlockById(content, "block-1")?.blockId, "block-1");
+});
+
+test("smart reference parser binds an adjacent marker to its Wiki Link", () => {
+  const source = "Before [[Folder/Target#^block-id|Custom \\| text]] %%ref:ref-123%% after";
+  assert.deepEqual(parseSmartReferenceLinks(source), [
+    {
+      from: 7,
+      to: 65,
+      linktext: "Folder/Target#^block-id|Custom \\| text",
+      target: "Folder/Target#^block-id",
+      alias: "Custom \\| text",
+      refId: "ref-123",
+    },
+  ]);
+  const offset = source.indexOf("Custom");
+  assert.equal(findSmartReferenceAtOffset(source, offset)?.refId, "ref-123");
+});
+
+test("smart reference parser ignores detached or malformed metadata", () => {
+  assert.deepEqual(parseSmartReferenceLinks("[[Target]] unrelated %%ref:id%%"), []);
+  assert.deepEqual(parseSmartReferenceLinks("[[Target]] %%ref:bad id%%"), []);
+  assert.equal(findSmartReferenceAtOffset("[[Target]]", 3), null);
+});
+
+test("reference lookup resolves known IDs and safely reports missing IDs", () => {
+  const reference = makeReference({ refId: "known" });
+  const references = { known: reference };
+  assert.equal(resolveReferenceById(references, "known"), reference);
+  assert.equal(resolveReferenceById(references, "missing"), null);
 });
 
 function makeReference(overrides: Partial<PreciseReference>): PreciseReference {

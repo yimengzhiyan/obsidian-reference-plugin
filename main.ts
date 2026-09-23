@@ -1,24 +1,41 @@
 import { Editor, FuzzySuggestModal, MarkdownFileInfo, MarkdownView, Notice, Plugin, TFile } from "obsidian";
-import { EditorView } from "@codemirror/view";
 import { ensureBlockId } from "./src/blocks.ts";
-import { preciseHighlightField, setPreciseHighlight } from "./src/highlight.ts";
-import { locateReference } from "./src/locator.ts";
-import { EMPTY_PLUGIN_DATA, type PendingReference, type PluginData, type PreciseReference } from "./src/model.ts";
+import { preciseHighlightField } from "./src/highlight.ts";
+import {
+  annotateRenderedSmartReferences,
+  findSmartReferenceAtOffset,
+  SMART_REF_ATTRIBUTE,
+} from "./src/links.ts";
+import {
+  getEditorSourceOffset,
+  showNavigationResult,
+  SmartReferenceNavigator,
+} from "./src/navigation.ts";
+import type { PendingReference, PreciseReference } from "./src/model.ts";
+import { ReferenceStore } from "./src/reference-store.ts";
 import { findUniqueTextRange } from "./src/text-ranges.ts";
 
-const HIGHLIGHT_DURATION_MS = 4_000;
 const CONTEXT_LENGTH = 32;
 
 export default class ReferencePlugin extends Plugin {
-  private data: PluginData = structuredClone(EMPTY_PLUGIN_DATA);
+  private store!: ReferenceStore;
+  private navigator!: SmartReferenceNavigator;
   private selectionTargetPath: string | null = null;
   private selectionStatus: HTMLElement | null = null;
-  private highlightTimer: number | null = null;
 
   async onload(): Promise<void> {
-    await this.loadPluginData();
+    this.store = new ReferenceStore(this);
+    this.navigator = new SmartReferenceNavigator(this.app);
+    await this.store.load();
     this.registerEditorExtension(preciseHighlightField);
     this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event));
+    this.registerDomEvent(document, "click", (event) => void this.handleSmartReferenceClick(event), {
+      capture: true,
+    });
+    this.registerMarkdownPostProcessor((element, context) => {
+      const section = context.getSectionInfo(element);
+      if (section) annotateRenderedSmartReferences(element, section.text);
+    });
 
     this.addCommand({
       id: "create-smart-reference",
@@ -36,23 +53,14 @@ export default class ReferencePlugin extends Plugin {
       callback: () => void this.highlightLastReference(),
     });
 
-    if (this.data.pending) {
+    if (this.store.pending) {
       new Notice("An unfinished Smart Reference is available; use Cancel Smart Reference to remove it.");
     }
   }
 
   onunload(): void {
-    if (this.highlightTimer !== null) window.clearTimeout(this.highlightTimer);
+    this.navigator.unload();
     this.exitSelectionMode();
-  }
-
-  private async loadPluginData(): Promise<void> {
-    const stored = (await this.loadData()) as Partial<PluginData> | null;
-    this.data = {
-      pending: stored?.pending ?? null,
-      references: stored?.references ?? {},
-      lastReferenceId: stored?.lastReferenceId ?? null,
-    };
   }
 
   private async startReference(editor: Editor, view: MarkdownView | MarkdownFileInfo): Promise<void> {
@@ -60,7 +68,7 @@ export default class ReferencePlugin extends Plugin {
       new Notice("Smart Reference requires an active Markdown file.");
       return;
     }
-    if (this.data.pending) {
+    if (this.store.pending) {
       new Notice("Finish or cancel the active Smart Reference first.");
       return;
     }
@@ -68,8 +76,7 @@ export default class ReferencePlugin extends Plugin {
     const id = crypto.randomUUID();
     const placeholder = `%%smart-ref:${id}%%`;
     editor.replaceRange(placeholder, editor.getCursor());
-    this.data.pending = { id, sourcePath: view.file.path, placeholder };
-    await this.saveData(this.data);
+    await this.store.setPending({ id, sourcePath: view.file.path, placeholder });
 
     new TargetNoteModal(this, view.file.path, (file) => {
       if (file) void this.selectTarget(file);
@@ -78,10 +85,9 @@ export default class ReferencePlugin extends Plugin {
   }
 
   private async selectTarget(file: TFile): Promise<void> {
-    const pending = this.data.pending;
+    const pending = this.store.pending;
     if (!pending) return;
-    pending.targetPath = file.path;
-    await this.saveData(this.data);
+    await this.store.updatePendingTarget(file.path);
     await this.app.workspace.getLeaf(false).openFile(file);
     this.enterSelectionMode(file.path);
   }
@@ -108,7 +114,7 @@ export default class ReferencePlugin extends Plugin {
   }
 
   private async confirmSelection(): Promise<void> {
-    const pending = this.data.pending;
+    const pending = this.store.pending;
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!pending || !view?.file || view.file.path !== this.selectionTargetPath) {
       new Notice("Return to the selected target note before confirming.");
@@ -152,10 +158,7 @@ export default class ReferencePlugin extends Plugin {
     const replaced = await this.replacePendingPlaceholder(pending, buildPreciseLink(view.file, reference));
     if (!replaced) return;
 
-    this.data.references[reference.refId] = reference;
-    this.data.lastReferenceId = reference.refId;
-    this.data.pending = null;
-    await this.saveData(this.data);
+    await this.store.addReference(reference);
     this.exitSelectionMode();
     const sourceFile = this.app.vault.getAbstractFileByPath(pending.sourcePath);
     if (sourceFile instanceof TFile) await this.app.workspace.getLeaf(false).openFile(sourceFile);
@@ -196,66 +199,56 @@ export default class ReferencePlugin extends Plugin {
   }
 
   private async cancelReference(): Promise<void> {
-    const pending = this.data.pending;
+    const pending = this.store.pending;
     if (!pending) {
       this.exitSelectionMode();
       new Notice("No Smart Reference is active.");
       return;
     }
     if (!(await this.replacePendingPlaceholder(pending, ""))) return;
-    this.data.pending = null;
-    await this.saveData(this.data);
+    await this.store.setPending(null);
     this.exitSelectionMode();
     new Notice("Smart Reference canceled and its placeholder removed.");
   }
 
   private async highlightLastReference(): Promise<void> {
-    const id = this.data.lastReferenceId;
-    const reference = id ? this.data.references[id] : undefined;
+    const id = this.store.lastReferenceId;
+    const reference = id ? this.store.getReference(id) : null;
     if (!reference) {
       new Notice("No completed precise reference is available.");
       return;
     }
-    const file = this.app.vault.getAbstractFileByPath(reference.targetFile);
-    if (!(file instanceof TFile)) {
-      new Notice(`Target note not found: ${reference.targetFile}`);
+    showNavigationResult(await this.navigator.navigate(reference));
+  }
+
+  private async handleSmartReferenceClick(event: MouseEvent): Promise<void> {
+    if (!(event.target instanceof Element)) return;
+    const anchor = event.target.closest<HTMLAnchorElement>("a.internal-link");
+    if (!anchor) return;
+
+    const refId = anchor.getAttribute(SMART_REF_ATTRIBUTE) ?? this.findLivePreviewRefId(anchor);
+    if (!refId) return;
+    const reference = this.store.getReference(refId);
+    if (!reference) {
+      new Notice(`Smart Reference metadata not found: ${refId}. Using native link navigation.`);
+      return;
+    }
+    if (!this.navigator.hasTarget(reference)) {
+      new Notice("Smart Reference target metadata is stale. Using native link navigation.");
       return;
     }
 
-    await this.app.workspace.getLeaf(false).openFile(file);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    showNavigationResult(await this.navigator.navigate(reference));
+  }
+
+  private findLivePreviewRefId(anchor: HTMLAnchorElement): string | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view || view.file?.path !== file.path) {
-      new Notice("Target note opened, but no Markdown editor is active.");
-      return;
-    }
-    const result = locateReference(view.editor.getValue(), reference);
-    if (result.kind === "missing-block") {
-      new Notice("Target block no longer exists.");
-      return;
-    }
-
-    // Obsidian exposes editor extensions publicly, but the dispatch bridge is
-    // currently the CodeMirror-backed Editor implementation's `cm` property.
-    const cm = (view.editor as Editor & { cm?: EditorView }).cm;
-    if (!cm) {
-      new Notice("Precise highlighting is only available in an editing view.");
-      return;
-    }
-    cm.dispatch({
-      effects: [
-        setPreciseHighlight.of(result.range),
-        EditorView.scrollIntoView(result.range.from, { y: "center" }),
-      ],
-    });
-    if (this.highlightTimer !== null) window.clearTimeout(this.highlightTimer);
-    this.highlightTimer = window.setTimeout(() => {
-      cm.dispatch({ effects: setPreciseHighlight.of(null) });
-      this.highlightTimer = null;
-    }, HIGHLIGHT_DURATION_MS);
-
-    if (result.kind === "block-only") {
-      new Notice("Exact text was ambiguous or changed; highlighted the native fallback block.");
-    }
+    if (!view || view.getMode() !== "source") return null;
+    const offset = getEditorSourceOffset(view, anchor);
+    if (offset === null) return null;
+    return findSmartReferenceAtOffset(view.editor.getValue(), offset)?.refId ?? null;
   }
 }
 

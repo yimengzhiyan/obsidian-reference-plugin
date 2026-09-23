@@ -40,7 +40,7 @@ Use a dedicated test Vault rather than a production Vault:
 6. Confirm that the plugin loads without an error in the developer console.
 7. Disable the plugin and confirm that it unloads without an error.
 
-## Milestone 1 spike commands
+## Smart Reference commands
 
 - **Create Smart Reference (precise text spike)** inserts a persistent
   placeholder, opens a fuzzy Markdown-note picker, and enters exact-selection
@@ -51,7 +51,12 @@ Use a dedicated test Vault rather than a production Vault:
 - **Cancel Smart Reference** cleans up an unfinished placeholder, including
   after navigation or plugin reload.
 
-These are technical-spike commands, not the final four-level user experience.
+Clicking a generated Smart Reference now triggers enhanced navigation in Live
+Preview and Reading View when its adjacent `%%ref:<id>%%` metadata can be
+resolved. Ordinary Wiki Links and unresolved Smart References are left to
+Obsidian's native link handler.
+
+These remain technical-spike commands, not the final four-level user experience.
 Use a disposable test Vault. Current manual checks are:
 
 1. Create a reference to text inside a normal paragraph and confirm the source
@@ -59,9 +64,14 @@ Use a disposable test Vault. Current manual checks are:
 2. Repeat with an existing block ID and confirm no duplicate is added.
 3. Cancel from the picker and from the target note; confirm the source has no
    orphan placeholder.
-4. Run the highlight command in Live Preview; confirm only the exact text is
-   highlighted temporarily and Markdown is unchanged.
+4. In Live Preview, click a generated Smart Reference; confirm its target opens,
+   the exact text scrolls into view, and the temporary highlight disappears.
 5. Repeat selection with a simple list item and record whether native block
    navigation resolves correctly in the installed Obsidian version.
-6. In Reading View, confirm the native block link still works. Enhanced click
-   interception is intentionally not part of this spike.
+6. In Reading View, click a generated Smart Reference and confirm the rendered
+   target text is temporarily highlighted without changing Markdown.
+7. Run the manual highlight command and confirm it still follows the same path.
+8. Temporarily disable the plugin and click the same link; confirm Obsidian still
+   opens the native block target.
+9. With the plugin enabled, delete the stored reference or move its target and
+   confirm the click falls through to native navigation without an exception.

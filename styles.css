@@ -3,3 +3,9 @@
   border-radius: 2px;
   outline: 2px solid var(--interactive-accent);
 }
+
+.smart-ref-reading-highlight {
+  background-color: var(--text-highlight-bg);
+  border-radius: 2px;
+  outline: 2px solid var(--interactive-accent);
+}
