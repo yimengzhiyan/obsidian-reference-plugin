@@ -9,26 +9,57 @@ export interface SmartReferenceLink {
   refId: string;
 }
 
-const SMART_LINK_PATTERN = /\[\[([^\]]+)\]\]([ \t]*)%%ref:([A-Za-z0-9_-]+)%%/g;
+interface WikiLink extends Omit<SmartReferenceLink, "refId"> {
+  refId: string | null;
+}
+
+const WIKI_LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
+const REF_MARKER_PATTERN = /^[ \t]*%%ref:([A-Za-z0-9_-]+)%%/;
 
 export function parseSmartReferenceLinks(source: string): SmartReferenceLink[] {
-  const links: SmartReferenceLink[] = [];
-  for (const match of source.matchAll(SMART_LINK_PATTERN)) {
+  return parseWikiLinks(source).filter((link): link is SmartReferenceLink => link.refId !== null);
+}
+
+function parseWikiLinks(source: string): WikiLink[] {
+  const links: WikiLink[] = [];
+  for (const match of source.matchAll(WIKI_LINK_PATTERN)) {
     if (match.index === undefined) continue;
     const linktext = match[1];
     const aliasSeparator = findUnescapedAliasSeparator(linktext);
     const target = aliasSeparator === -1 ? linktext : linktext.slice(0, aliasSeparator);
     const alias = aliasSeparator === -1 ? null : linktext.slice(aliasSeparator + 1);
+    const marker = REF_MARKER_PATTERN.exec(source.slice(match.index + match[0].length));
     links.push({
       from: match.index,
-      to: match.index + match[0].length,
+      to: match.index + match[0].length + (marker?.[0].length ?? 0),
       linktext,
       target,
       alias,
-      refId: match[3],
+      refId: marker?.[1] ?? null,
     });
   }
   return links;
+}
+
+/** Resolve a rendered Live Preview anchor by its source line and ordinal among
+ * links to the same target. A unique target in the whole note is a safe fallback
+ * when CodeMirror cannot map a rendered link to its current source line. */
+export function resolveLivePreviewReference(
+  source: string,
+  target: string,
+  sourceLine: string | null,
+  targetOrdinal: number | null,
+  renderedTargetCount: number | null,
+): string | null {
+  if (sourceLine !== null && targetOrdinal !== null && renderedTargetCount !== null) {
+    const lineLinks = parseWikiLinks(sourceLine).filter((link) => link.target === target);
+    if (lineLinks.length === renderedTargetCount) {
+      return lineLinks[targetOrdinal]?.refId ?? null;
+    }
+  }
+
+  const allLinks = parseWikiLinks(source).filter((link) => link.target === target);
+  return allLinks.length === 1 ? allLinks[0].refId : null;
 }
 
 export function findSmartReferenceAtOffset(

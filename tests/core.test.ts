@@ -2,9 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ensureBlockId, findBlockById, findContainingBlock } from "../src/blocks.ts";
 import { locateReference } from "../src/locator.ts";
-import { findSmartReferenceAtOffset, parseSmartReferenceLinks } from "../src/links.ts";
+import {
+  findSmartReferenceAtOffset,
+  parseSmartReferenceLinks,
+  resolveLivePreviewReference,
+} from "../src/links.ts";
 import type { PreciseReference } from "../src/model.ts";
+import { classifyHighlightResult } from "../src/navigation-result.ts";
 import { resolveReferenceById } from "../src/reference-store.ts";
+import { findRenderedTextRange } from "../src/rendered-text.ts";
 import { resolveSelectionContext } from "../src/selection-context.ts";
 import { SingleSettlement } from "../src/single-settlement.ts";
 import { findUniqueTextRange } from "../src/text-ranges.ts";
@@ -94,6 +100,38 @@ test("smart reference parser ignores detached or malformed metadata", () => {
   assert.equal(findSmartReferenceAtOffset("[[Target]]", 3), null);
 });
 
+test("Live Preview association survives edits before, after, and elsewhere in Source", () => {
+  const link = "[[Target#^block-1|Display]] %%ref:ref-1%%";
+  const sources = [
+    `Introduction ${link}\nTail`,
+    `Inserted before. Introduction ${link}\nTail`,
+    `Introduction ${link} added after\nTail`,
+    `Introduction ${link}\nUnrelated paragraph changed`,
+  ];
+  for (const source of sources) {
+    const line = source.split("\n")[0];
+    assert.equal(resolveLivePreviewReference(source, "Target#^block-1", line, 0, 1), "ref-1");
+    assert.equal(resolveLivePreviewReference(source, "Target#^block-1", null, null, null), "ref-1");
+  }
+});
+
+test("alias edits preserve refId association without matching stored display text", () => {
+  const source = "[[Target#^block-1|New display words]] %%ref:ref-1%%";
+  assert.equal(resolveLivePreviewReference(source, "Target#^block-1", source, 0, 1), "ref-1");
+});
+
+test("ordinary links and ambiguous same-target links are never borrowed by a Smart Reference", () => {
+  const source = "[[Target#^block-1|Ordinary]] [[Target#^block-1|Smart]] %%ref:ref-1%%";
+  assert.equal(resolveLivePreviewReference(source, "Target#^block-1", source, 0, 2), null);
+  assert.equal(resolveLivePreviewReference(source, "Target#^block-1", source, 1, 2), "ref-1");
+  assert.equal(resolveLivePreviewReference(source, "Target#^block-1", null, null, null), null);
+});
+
+test("text inserted between Wiki Link and marker breaks the intentional adjacency", () => {
+  const source = "[[Target#^block-1|Display]] inserted %%ref:ref-1%%";
+  assert.equal(resolveLivePreviewReference(source, "Target#^block-1", source, 0, 1), null);
+});
+
 test("reference lookup resolves known IDs and safely reports missing IDs", () => {
   const reference = makeReference({ refId: "known" });
   const references = { known: reference };
@@ -158,6 +196,26 @@ test("modal settlement ignores duplicate close and callback paths", () => {
   assert.equal(settlement.settle(null), false);
   assert.equal(settlement.settle("Late Target.md"), false);
   assert.deepEqual(results, [null]);
+});
+
+test("unchanged rendered target stays exact, including folded whitespace", () => {
+  const selectedText = "chosen words";
+  const rendered = "Prefix chosen words suffix";
+  assert.deepEqual(findRenderedTextRange(rendered, selectedText, "Prefix ", " suffix"), {
+    from: 7,
+    to: 19,
+  });
+  assert.deepEqual(findRenderedTextRange("Prefix chosen\u00a0  words suffix", "chosen words", "", ""), {
+    from: 7,
+    to: 21,
+  });
+});
+
+test("rendered exact failure reports block fallback instead of exact", () => {
+  assert.equal(classifyHighlightResult("exact", "exact"), "highlighted-exact");
+  assert.equal(classifyHighlightResult("exact", "block"), "highlighted-block");
+  assert.equal(classifyHighlightResult("block-only", "block"), "highlighted-block");
+  assert.equal(classifyHighlightResult("exact", null), "unsupported-view");
 });
 
 function makeReference(overrides: Partial<PreciseReference>): PreciseReference {

@@ -3,15 +3,12 @@ import { EditorView } from "@codemirror/view";
 import { locateReference, type LocateResult } from "./locator.ts";
 import type { PreciseReference } from "./model.ts";
 import { setPreciseHighlight } from "./highlight.ts";
+import { findRenderedTextRange } from "./rendered-text.ts";
+import { classifyHighlightResult, type NavigationResult } from "./navigation-result.ts";
 
 const HIGHLIGHT_DURATION_MS = 4_000;
 
-export type NavigationResult =
-  | "highlighted-exact"
-  | "highlighted-block"
-  | "missing-target"
-  | "missing-block"
-  | "unsupported-view";
+type AppliedHighlight = { kind: "exact" | "block"; cleanup: () => void };
 
 export class SmartReferenceNavigator {
   private clearHighlight: (() => void) | null = null;
@@ -32,17 +29,25 @@ export class SmartReferenceNavigator {
     if (!view || view.file?.path !== file.path) return "unsupported-view";
 
     const location = locateReference(view.getViewData(), reference);
+    console.debug("[Smart Reference] target locator", { refId: reference.refId, kind: location.kind });
     if (location.kind === "missing-block") return "missing-block";
 
     this.cancelHighlight();
-    const cleanup = view.getMode() === "preview"
+    const applied = view.getMode() === "preview"
       ? await highlightReadingView(view, reference, location)
       : highlightEditingView(view, location);
-    if (!cleanup) return "unsupported-view";
+    if (!applied) return "unsupported-view";
 
-    this.clearHighlight = cleanup;
+    this.clearHighlight = applied.cleanup;
     this.highlightTimer = window.setTimeout(() => this.cancelHighlight(), HIGHLIGHT_DURATION_MS);
-    return location.kind === "exact" ? "highlighted-exact" : "highlighted-block";
+    const result = classifyHighlightResult(location.kind, applied.kind);
+    console.debug("[Smart Reference] highlight applied", {
+      refId: reference.refId,
+      locatorKind: location.kind,
+      appliedKind: applied.kind,
+      result,
+    });
+    return result;
   }
 
   unload(): void {
@@ -68,9 +73,7 @@ export function getEditorSourceOffset(view: MarkdownView, node: Node): number | 
 }
 
 export function showNavigationResult(result: NavigationResult): void {
-  if (result === "highlighted-block") {
-    new Notice("Exact text changed or was ambiguous; highlighted the native fallback block.");
-  } else if (result === "missing-target") {
+  if (result === "missing-target") {
     new Notice("Smart Reference target was moved or deleted; using native link fallback.");
   } else if (result === "missing-block") {
     new Notice("Smart Reference block no longer exists.");
@@ -79,7 +82,7 @@ export function showNavigationResult(result: NavigationResult): void {
   }
 }
 
-function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult, { kind: "missing-block" }>): (() => void) | null {
+function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult, { kind: "missing-block" }>): AppliedHighlight | null {
   const cm = getCodeMirrorView(view.editor);
   if (!cm) return null;
   cm.dispatch({
@@ -88,38 +91,47 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
       EditorView.scrollIntoView(location.range.from, { y: "center" }),
     ],
   });
-  return () => cm.dispatch({ effects: setPreciseHighlight.of(null) });
+  return {
+    kind: location.kind === "exact" ? "exact" : "block",
+    cleanup: () => cm.dispatch({ effects: setPreciseHighlight.of(null) }),
+  };
 }
 
 async function highlightReadingView(
   view: MarkdownView,
   reference: PreciseReference,
   location: Exclude<LocateResult, { kind: "missing-block" }>,
-): Promise<(() => void) | null> {
+): Promise<AppliedHighlight | null> {
   await nextAnimationFrame();
   const preview = view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
   if (!preview) return null;
   const escapedId = CSS.escape(reference.blockId);
-  const block = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
-  if (!block) return null;
+  const idElement = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
+  if (!idElement) return null;
+  const block = idElement.closest<HTMLElement>("p, li") ?? idElement;
 
   if (location.kind === "block-only") {
     block.classList.add("smart-ref-reading-highlight");
     block.scrollIntoView({ block: "center" });
-    return () => block.classList.remove("smart-ref-reading-highlight");
+    return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
   }
 
   const spans = wrapText(block, reference.selectedText, reference.prefix, reference.suffix);
   if (spans.length === 0) {
+    console.debug("[Smart Reference] rendered exact text unavailable; using block highlight", {
+      refId: reference.refId,
+      selectedText: reference.selectedText,
+      renderedText: block.textContent,
+    });
     block.classList.add("smart-ref-reading-highlight");
     block.scrollIntoView({ block: "center" });
-    return () => block.classList.remove("smart-ref-reading-highlight");
+    return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
   }
   spans[0].scrollIntoView({ block: "center" });
-  return () => {
+  return { kind: "exact", cleanup: () => {
     for (const span of spans) span.replaceWith(...Array.from(span.childNodes));
     block.normalize();
-  };
+  } };
 }
 
 function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffix: string): HTMLElement[] {
@@ -131,9 +143,9 @@ function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffi
     nodes.push(node);
     combined += node.data;
   }
-  const start = chooseOccurrence(combined, selectedText, prefix, suffix);
-  if (start === -1) return [];
-  const end = start + selectedText.length;
+  const found = findRenderedTextRange(combined, selectedText, prefix, suffix);
+  if (!found) return [];
+  const { from: start, to: end } = found;
   const spans: HTMLElement[] = [];
   let cursor = 0;
 
@@ -153,23 +165,6 @@ function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffi
     spans.push(span);
   }
   return spans;
-}
-
-function chooseOccurrence(content: string, text: string, prefix: string, suffix: string): number {
-  const matches: number[] = [];
-  let from = 0;
-  while (from <= content.length) {
-    const index = content.indexOf(text, from);
-    if (index === -1) break;
-    matches.push(index);
-    from = index + Math.max(text.length, 1);
-  }
-  if (matches.length === 1) return matches[0];
-  const contextual = matches.filter((index) =>
-    content.slice(Math.max(0, index - prefix.length), index).endsWith(prefix) &&
-    content.slice(index + text.length, index + text.length + suffix.length).startsWith(suffix)
-  );
-  return contextual.length === 1 ? contextual[0] : -1;
 }
 
 function getCodeMirrorView(editor: Editor): EditorView | null {

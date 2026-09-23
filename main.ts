@@ -13,7 +13,7 @@ import { ensureBlockId } from "./src/blocks.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
-  findSmartReferenceAtOffset,
+  resolveLivePreviewReference,
   SMART_REF_ATTRIBUTE,
 } from "./src/links.ts";
 import {
@@ -289,14 +289,23 @@ export default class ReferencePlugin extends Plugin {
     if (!anchor) return;
 
     const refId = anchor.getAttribute(SMART_REF_ATTRIBUTE) ?? this.findLivePreviewRefId(anchor);
-    if (!refId) return;
+    if (!refId) {
+      console.debug("[Smart Reference] click not associated with a ref marker", {
+        href: anchor.dataset.href ?? null,
+        text: anchor.textContent,
+      });
+      return;
+    }
     const reference = this.store.getReference(refId);
     if (!reference) {
-      new Notice(`Smart Reference metadata not found: ${refId}. Using native link navigation.`);
+      console.debug("[Smart Reference] reference metadata missing; native link handles click", { refId });
       return;
     }
     if (!this.navigator.hasTarget(reference)) {
-      new Notice("Smart Reference target metadata is stale. Using native link navigation.");
+      console.debug("[Smart Reference] target missing; native link handles click", {
+        refId,
+        targetPath: reference.targetFile,
+      });
       return;
     }
 
@@ -306,11 +315,50 @@ export default class ReferencePlugin extends Plugin {
   }
 
   private findLivePreviewRefId(anchor: HTMLAnchorElement): string | null {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view || view.getMode() !== "source") return null;
-    const offset = getEditorSourceOffset(view, anchor);
-    if (offset === null) return null;
-    return findSmartReferenceAtOffset(view.editor.getValue(), offset)?.refId ?? null;
+    const matchingViews: MarkdownView[] = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(anchor)) {
+        matchingViews.push(leaf.view);
+      }
+    });
+    const view = matchingViews[0];
+    if (!view || view.getMode() !== "source") {
+      console.debug("[Smart Reference] clicked link has no source editor view");
+      return null;
+    }
+
+    const target = anchor.dataset.href ?? anchor.getAttribute("data-href");
+    if (!target) {
+      console.debug("[Smart Reference] clicked link has no data-href");
+      return null;
+    }
+    const source = view.editor.getValue();
+    const lineElement = anchor.closest(".cm-line");
+    const offset = lineElement ? getEditorSourceOffset(view, lineElement) : null;
+    const line = offset === null ? null : view.editor.getLine(view.editor.offsetToPos(offset).line);
+    const renderedMatches = lineElement
+      ? Array.from(lineElement.querySelectorAll<HTMLAnchorElement>("a.internal-link"))
+        .filter((candidate) => (candidate.dataset.href ?? candidate.getAttribute("data-href")) === target)
+      : [];
+    const ordinal = renderedMatches.indexOf(anchor);
+    const refId = resolveLivePreviewReference(
+      source,
+      target,
+      line,
+      ordinal < 0 ? null : ordinal,
+      lineElement ? renderedMatches.length : null,
+    );
+    if (!refId) {
+      console.debug("[Smart Reference] Live Preview marker association failed", {
+        target,
+        sourcePath: view.file?.path ?? null,
+        sourceOffset: offset,
+        sourceLine: line,
+        targetOrdinal: ordinal,
+        renderedTargetCount: renderedMatches.length,
+      });
+    }
+    return refId;
   }
 }
 
