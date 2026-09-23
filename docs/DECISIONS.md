@@ -594,3 +594,34 @@ CodeMirror document，因此在目标 block 的 rendered DOM 中查找 exact tex
 Obsidian 仍未公开从 `Editor` dispatch CM6 effect 的 API。`editor.cm` 和
 `posAtDOM` bridge 已集中隔离在 `src/navigation.ts`；bridge 不存在或 DOM node
 不属于 editor 时返回 null，而不是中断 native navigation。
+
+---
+
+## D-031 — Selection confirmation 必须在 capture phase 并绑定 target leaf
+
+**Status:** Confirmed by real Obsidian runtime failure; fix implemented, revalidation pending
+
+真实手动测试发现：target note 正确打开并划选文字后，按 Enter 会看到 selection
+collapse，流程不返回 source，并显示旧的合并错误提示：
+
+```text
+Return to the selected target note before confirming.
+```
+
+旧实现有两个不安全假设：
+
+1. document bubble-phase keydown 能在 CodeMirror 处理 Enter 前读取 selection；
+2. `workspace.getActiveViewOfType(MarkdownView)` 一定返回 workflow 打开的 target view。
+
+修复决定：
+
+- 只在 selection mode active 且 key 为 Enter/Escape 时，于 document capture
+  phase 调用 `preventDefault` 和 `stopPropagation`；
+- selection 内容和 positions 必须在第一个 async operation 前同步读取；
+- 保存执行 `openFile(target)` 的 `WorkspaceLeaf`，并显式激活该 leaf；
+- confirmation 优先使用 retained leaf 中 path 匹配的 `MarkdownView`，否则使用
+  path 匹配的 active view；
+- pending missing、expected target missing、no Markdown view、wrong active path、
+  empty selection 必须分别诊断；expected/actual paths 只写入 debug log。
+
+该改变不影响 selection mode 之外的键盘行为，也不改变 click interception 架构。

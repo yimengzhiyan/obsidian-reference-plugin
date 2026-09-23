@@ -2,17 +2,35 @@
 
 ## Current phase
 
-**Phase:** Milestone 2 — Smart Reference Click Interception
+**Phase:** Runtime selection-confirmation fix after Milestone 2 validation
 
-**Branch:** `codex/click-interception`
+**Branch:** `codex/runtime-selection-fix`
 
 **Environment:** Linux / Codex; dependencies already installed in the repository workspace
 
-The reviewed Milestone 0/1 creation, anchoring, recovery, and highlight spikes
-remain intact. This milestone adds automatic enhanced navigation when the user
-clicks a generated Smart Reference.
+Manual Obsidian validation found a real failure in the selection-confirmation
+path: after opening the target, selecting text, and pressing Enter, the selection
+collapsed and the workflow reported "Return to the selected target note before
+confirming." The click-interception architecture remains unchanged; this branch
+only fixes that runtime regression.
 
 ## Implemented
+
+- Selection-mode Enter/Escape handling now runs in document capture phase, calls
+  `preventDefault`/`stopPropagation` only while selection mode is active, and
+  therefore reads the selection before CodeMirror's Enter handling can mutate it.
+- The exact `WorkspaceLeaf` used to open the target is retained for the lifetime
+  of selection mode. Confirmation uses the retained leaf's matching Markdown
+  view first, with a matching active Markdown view as fallback.
+- Target opening explicitly activates/focuses the selected leaf after `openFile`.
+- Confirmation diagnostics now distinguish missing pending state, missing target
+  state, no Markdown view, wrong active target, and empty selection. Structured
+  debug logging records expected, active, and retained paths without noisy
+  success-path logging.
+- Pure tests cover active-view preference, retained-leaf fallback, and every
+  context failure classification.
+
+The prior click-interception implementation remains implemented:
 
 - Source parser for the adjacent representation:
 
@@ -36,13 +54,13 @@ clicks a generated Smart Reference.
   highlight is used when exact rendered text cannot be resolved.
 - Reference persistence and lookup isolated in `src/reference-store.ts`.
 - Link detection and rendered-link annotation isolated in `src/links.ts`.
-- Eight automated core tests, including marker parsing, source-offset lookup,
+- Ten automated core tests, including marker parsing, source-offset lookup,
   known reference resolution, and missing reference behavior.
 - Updated manual test-Vault checklist in `README.md`.
 
 ## Validation performed
 
-- `npm test`: passed (8 tests).
+- `npm test`: passed (10 tests).
 - `npm run typecheck`: passed.
 - `npm run build`: passed; ignored `main.js` generated.
 - `git diff --check`: passed during implementation.
@@ -50,6 +68,14 @@ clicks a generated Smart Reference.
 No new Obsidian UI claims have been marked manually verified in this environment.
 
 ## Manual validation still required
+
+- Re-run the exact reproduced regression: target opens → mouse selection → Enter
+  → selection captured → block ID created/reused → placeholder replaced → source
+  note reopened.
+- Confirm Escape is consumed only during selection mode and normal Enter/Escape
+  editor behavior is unchanged outside that mode.
+- Confirm diagnostics for deliberately changing to a different note while a
+  selection operation is pending.
 
 - Live Preview click interception, navigation, scrolling, and exact CM6 highlight.
 - Reading View post-processor association, click interception, block lookup, and
@@ -68,6 +94,13 @@ No new Obsidian UI claims have been marked manually verified in this environment
 
 ## API findings and limitations
 
+- Real runtime evidence shows `getActiveViewOfType(MarkdownView)` is not a
+  sufficient identity anchor for this cross-note workflow. The leaf returned by
+  `getLeaf(false)` and used by `openFile` must be retained and inspected directly.
+- A document bubble-phase key handler runs after target editor handlers. For
+  selection confirmation, capture phase is required so Enter cannot collapse or
+  replace the selection before it is recorded.
+
 - Obsidian exposes no documented Smart-Wiki-Link click event carrying adjacent
   hidden-comment source context.
 - `registerMarkdownPostProcessor` is the public Reading View integration point;
@@ -85,7 +118,6 @@ No new Obsidian UI claims have been marked manually verified in this environment
 
 ## Next recommended step
 
-Install this branch into a disposable Vault and execute the README click checklist
-in Live Preview and Reading View. Record the DOM/API results, especially repeated
-links and popout windows, before expanding click handling or starting another
-milestone.
+Install this branch into the same disposable Vault that reproduced the failure
+and run the selection-confirmation regression first. Only after it passes should
+the remaining Live Preview and Reading View click checklist continue.

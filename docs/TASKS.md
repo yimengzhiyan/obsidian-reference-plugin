@@ -108,6 +108,10 @@
 - [x] Enter 确认
 - [x] Esc 取消
 - [x] 防止空 selection 被确认
+- [x] keydown 使用 capture phase，在 CodeMirror mutation 前捕获 Enter/Escape
+- [x] selection mode 之外不消费正常 Enter/Escape
+- [x] 保留 target WorkspaceLeaf，避免只依赖 global active view
+- [x] 拆分 pending/view/path/empty-selection runtime diagnostics
 
 ### Acceptance Criteria
 
@@ -115,6 +119,7 @@
 - [ ] 可选择任意几个词
 - [x] 能保存 selectedText、range 和上下文 metadata（待 UI 复测）
 - [x] 取消路径不写入目标文件（实现及纯逻辑验证；待 UI 复测）
+- [ ] Runtime regression: Target opens → select → Enter → block ID → replace placeholder → return source
 
 ---
 
