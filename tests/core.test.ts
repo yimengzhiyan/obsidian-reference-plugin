@@ -6,6 +6,7 @@ import { findSmartReferenceAtOffset, parseSmartReferenceLinks } from "../src/lin
 import type { PreciseReference } from "../src/model.ts";
 import { resolveReferenceById } from "../src/reference-store.ts";
 import { resolveSelectionContext } from "../src/selection-context.ts";
+import { SingleSettlement } from "../src/single-settlement.ts";
 import { findUniqueTextRange } from "../src/text-ranges.ts";
 
 test("placeholder lookup requires exactly one token", () => {
@@ -133,6 +134,30 @@ test("selection context reports distinct runtime failure causes", () => {
     kind: "wrong-active-target",
     actualPath: "Other.md",
   });
+});
+
+test("modal settlement keeps selection when close follows select", () => {
+  const results: Array<string | null> = [];
+  const settlement = new SingleSettlement<string>((value) => results.push(value));
+  assert.equal(settlement.settle("Target.md"), true);
+  assert.equal(settlement.settle(null), false);
+  assert.deepEqual(results, ["Target.md"]);
+});
+
+test("modal settlement treats close without selection as one cancellation", () => {
+  const results: Array<string | null> = [];
+  const settlement = new SingleSettlement<string>((value) => results.push(value));
+  assert.equal(settlement.settle(null), true);
+  assert.deepEqual(results, [null]);
+});
+
+test("modal settlement ignores duplicate close and callback paths", () => {
+  const results: Array<string | null> = [];
+  const settlement = new SingleSettlement<string>((value) => results.push(value));
+  assert.equal(settlement.settle(null), true);
+  assert.equal(settlement.settle(null), false);
+  assert.equal(settlement.settle("Late Target.md"), false);
+  assert.deepEqual(results, [null]);
 });
 
 function makeReference(overrides: Partial<PreciseReference>): PreciseReference {

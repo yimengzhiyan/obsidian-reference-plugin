@@ -1,5 +1,6 @@
 import {
   Editor,
+  FuzzyMatch,
   FuzzySuggestModal,
   MarkdownFileInfo,
   MarkdownView,
@@ -23,6 +24,7 @@ import {
 import type { PendingReference, PreciseReference } from "./src/model.ts";
 import { ReferenceStore } from "./src/reference-store.ts";
 import { resolveSelectionContext } from "./src/selection-context.ts";
+import { SingleSettlement } from "./src/single-settlement.ts";
 import { findUniqueTextRange } from "./src/text-ranges.ts";
 
 const CONTEXT_LENGTH = 32;
@@ -313,14 +315,15 @@ export default class ReferencePlugin extends Plugin {
 }
 
 class TargetNoteModal extends FuzzySuggestModal<TFile> {
-  private selected = false;
+  private readonly settlement: SingleSettlement<TFile>;
 
   constructor(
     plugin: ReferencePlugin,
     private readonly sourcePath: string,
-    private readonly done: (file: TFile | null) => void,
+    done: (file: TFile | null) => void,
   ) {
     super(plugin.app);
+    this.settlement = new SingleSettlement(done);
     this.setPlaceholder("Choose a Markdown note to reference…");
   }
 
@@ -332,14 +335,21 @@ class TargetNoteModal extends FuzzySuggestModal<TFile> {
     return file.path;
   }
 
-  onChooseItem(file: TFile): void {
-    this.selected = true;
-    this.done(file);
+  selectSuggestion(value: FuzzyMatch<TFile>, event: MouseEvent | KeyboardEvent): void {
+    // Obsidian may close the modal before onChooseItem runs. Commit the result
+    // before delegating so onClose cannot misclassify a selection as cancellation.
+    this.settlement.settle(value.item);
+    super.selectSuggestion(value, event);
+  }
+
+  onChooseItem(file: TFile, _event: MouseEvent | KeyboardEvent): void {
+    // Retained as an API-compatible fallback; settlement is idempotent.
+    this.settlement.settle(file);
   }
 
   onClose(): void {
     super.onClose();
-    if (!this.selected) this.done(null);
+    this.settlement.settle(null);
   }
 }
 

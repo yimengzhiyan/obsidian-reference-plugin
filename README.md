@@ -60,9 +60,12 @@ These remain technical-spike commands, not the final four-level user experience.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:
-   `Target opens → select text → Enter → selection is captured before editor
+   `Choose Target → modal closes without cancelling pending state or removing the
+   source placeholder → Target opens → select text → Enter → selection is captured before editor
    mutation → block ID is created/reused → source placeholder is replaced →
    workflow returns to the source note`.
+   Confirm that target selection settles once even though Obsidian invokes modal
+   close and choose callbacks during the same lifecycle.
 2. Create a reference to text inside a normal paragraph and confirm the source
    receives a native `[[Note#^block-id|Alias]]` plus hidden ref marker.
 3. Repeat with an existing block ID and confirm no duplicate is added.
