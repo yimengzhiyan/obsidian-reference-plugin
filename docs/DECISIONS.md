@@ -659,3 +659,46 @@ Obsidian public API 声明 `SuggestModal.selectSuggestion(value, event)` 可以 
 真实取消仍由 `onClose` 提交 `null`；如果 selection 已经提交，close 和后续
 choose callback 都是 no-op。该修复不改变 capture-phase keyboard handling、
 retained target leaf、selection diagnostics 或 click interception。
+
+---
+
+## D-033 — Live Preview 点击关联使用当前 source line 的 target/顺序
+
+**Status:** Runtime failure observed; replacement implemented, runtime revalidation pending
+
+真实 Obsidian 测试中，Source 普通编辑后 native Block Link 仍能导航，但增强高亮
+消失。旧方案把 `posAtDOM(anchor)` 当作 Wiki Link 内部的 source offset，
+`findSmartReferenceAtOffset` 仅接受该范围内的 offset。CodeMirror 对 rendered
+DOM node 的映射只保证获得编辑器位置，不保证 anchor 映射到 Wiki Link 的某个字符；
+因此这个约束不适合做稳定关联。具体失败的 runtime stage 尚需新日志确认。
+
+新决定：先找包含点击 anchor 的 `MarkdownView`，用 `posAtDOM` 只定位当前
+source line，再按 link `data-href` 和同目标 link 的顺序，关联该行当前的
+Wiki Links（含普通 Wiki Link，避免误借 ref ID）。如果 line mapping 不可用，
+只在全笔记中此 target 的 Wiki Link 唯一时回退关联；重复 target 必须放弃
+增强并交给原生导航。每次从当前 Markdown 解析，所以前后插字、无关编辑及
+alias 修改不依赖旧 offset 或显示文字。
+
+仍保持 `[[Target#^block-id|Alias]] %%ref:id%%` 的相邻 marker 合约。若在
+Wiki Link 与 marker 之间插入非空白内容，增强关联失效，native link 保留。
+使用 `editor.cm` 的有限 bridge 仍是兼容风险；未引入自定义 URL/private
+click event。混合 Markdown/Wiki link、重复相同 target 和 Obsidian runtime
+映射仍需 test Vault 验证。
+
+---
+
+## D-034 — 导航结果必须反映真正应用的高亮
+
+**Status:** Runtime failure observed; reporting fix implemented, runtime revalidation pending
+
+真实点击未编辑的 target 时出现整个 block 高亮。旧 `navigate()` 只看
+`locateReference().kind`，即使 Reading View 的 exact DOM wrapping 失败并
+高亮 block，也可能返回 `highlighted-exact`。这是已确认的结果传播错误；
+导致 DOM wrapping 失败的具体原因（block ID 所在元素范围、rendered
+whitespace 或 source locator）尚未从该 Vault 的日志确认。
+
+新决定：rendered/editor highlight 层必须返回实际应用的 `exact` 或 `block`
+种类；最终 `NavigationResult` 以此为准。Reading View 先扩展到包含 block
+ID 的 paragraph/list item，再用允许空白折叠的 rendered text 搜索。无法唯一
+定位时继续安全地高亮 block，并记录 debug 日志，不再声称 exact 已高亮，
+也不向用户显示暗示原文已被修改的错误 Notice。Markdown 不作高亮修改。

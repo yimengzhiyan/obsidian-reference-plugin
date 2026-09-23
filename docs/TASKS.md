@@ -97,7 +97,7 @@
 
 - [ ] 100+ 笔记下搜索仍可用
 - [ ] 选择后目标文件正确打开（已实现，待 Obsidian 手动验证）
-- [ ] Runtime regression: choose target → onClose does not cancel → pending/placeholder survive
+- [x] Runtime regression: choose target → onClose does not cancel → pending/placeholder survive (manually validated)
 
 ---
 
@@ -123,7 +123,7 @@
 - [ ] 可选择任意几个词
 - [x] 能保存 selectedText、range 和上下文 metadata（待 UI 复测）
 - [x] 取消路径不写入目标文件（实现及纯逻辑验证；待 UI 复测）
-- [ ] Runtime regression: Target opens → select → Enter → block ID → replace placeholder → return source
+- [x] Runtime regression: Target opens → select → Enter → block ID → replace placeholder → return source (manually validated)
 
 ---
 
@@ -357,6 +357,25 @@ _Originally numbered roadmap Milestone 6; promoted by the approved development s
 - [ ] Live Preview（实现完成，待 Obsidian 手动验证）
 - [ ] Reading View（实现完成，待 Obsidian 手动验证）
 - [x] Source Mode compatibility boundary documented; raw-source links are not intercepted
+
+## Click-runtime repair after manual validation
+
+Real Obsidian runtime found whole-block highlighting for unchanged text and loss
+of enhancement after unrelated Source edits. Native block navigation survived.
+
+- [x] Return actual applied highlight kind, not source locator kind alone
+- [x] Allow folded rendered whitespace during exact-text matching
+- [x] Resolve Live Preview link by containing view, source line, target and ordinal
+- [x] Pure tests for edits before/after link, elsewhere in Source, and alias changes
+- [x] Pure test that rendered exact failure reports block fallback
+- [x] Add debug distinctions for association, metadata, target, locator, and rendered fallback
+- [ ] Real-Obsidian: unchanged target highlights only selected phrase in Live Preview
+- [ ] Real-Obsidian: unchanged target highlights only selected phrase in Reading View
+- [ ] Real-Obsidian: Source edits before/after/elsewhere and alias change retain enhancement
+- [ ] Real-Obsidian: confirm native link fallback with plugin disabled
+
+Deliberately inserting text between the Wiki Link and `%%ref:id%%` breaks
+adjacency by design; the native Wiki Block Link remains valid.
 
 ## Acceptance Criteria
 

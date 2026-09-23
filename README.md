@@ -57,6 +57,9 @@ resolved. Ordinary Wiki Links and unresolved Smart References are left to
 Obsidian's native link handler.
 
 These remain technical-spike commands, not the final four-level user experience.
+The creation flow has been manually validated; click-runtime fixes on this
+branch still require a test-Vault run. Open the developer console and filter
+for `[Smart Reference]` if enhancement falls through or highlights a block.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:
@@ -71,14 +74,23 @@ Use a disposable test Vault. Current manual checks are:
 3. Repeat with an existing block ID and confirm no duplicate is added.
 4. Cancel from the picker and from the target note; confirm the source has no
    orphan placeholder.
-5. In Live Preview, click a generated Smart Reference; confirm its target opens,
-   the exact text scrolls into view, and the temporary highlight disappears.
+5. In Live Preview, click a generated Smart Reference with an unchanged target;
+   confirm only the selected words highlight, the target scrolls into view, and
+   the temporary highlight disappears. Confirm the log reports locator `exact`
+   and applied `exact`. Repeat in Reading View; if a whole block highlights,
+   record whether the locator or rendered-DOM fallback was responsible.
 6. Repeat selection with a simple list item and record whether native block
    navigation resolves correctly in the installed Obsidian version.
-7. In Reading View, click a generated Smart Reference and confirm the rendered
-   target text is temporarily highlighted without changing Markdown.
+7. Return to Source and, one at a time, insert text before the Smart Reference,
+   insert text after it, edit unrelated text elsewhere, and edit its alias while
+   preserving the target and `%%ref:id%%`. Click after each edit in Live Preview;
+   enhanced highlighting must still occur. Save/reopen Source between cases if
+   needed to exercise rerendering. Inspect association debug logs on failure.
 8. Run the manual highlight command and confirm it still follows the same path.
 9. Temporarily disable the plugin and click the same link; confirm Obsidian still
    opens the native block target.
 10. With the plugin enabled, delete the stored reference or move its target and
    confirm the click falls through to native navigation without an exception.
+11. Deliberately insert non-whitespace text between the Wiki Link and its
+    `%%ref:id%%` marker. Enhanced association should stop, while the native
+    block link should continue to navigate. Restore adjacency afterward.
