@@ -625,3 +625,37 @@ Return to the selected target note before confirming.
   empty selection 必须分别诊断；expected/actual paths 只写入 debug log。
 
 该改变不影响 selection mode 之外的键盘行为，也不改变 click interception 架构。
+
+---
+
+## D-032 — SuggestModal selection 必须在 base close 前单次提交
+
+**Status:** Confirmed by real Obsidian runtime failure; fix implemented, revalidation pending
+
+第二次真实手动测试确认：previous selection fix 保留了选区，但 target picker
+选择后 pending state 已丢失，source placeholder 也已删除；Target 仍会随后打开。
+这与实际 lifecycle 一致：
+
+```text
+select suggestion
+→ modal onClose
+→ old selected flag 仍为 false
+→ done(null) / cancelReference
+→ placeholder 删除且 pending 清空
+→ onChooseItem / done(file)
+→ Target 打开
+```
+
+Obsidian public API 声明 `SuggestModal.selectSuggestion(value, event)` 可以 override，
+但没有保证 `onClose` 和 `onChooseItem` 的调用顺序。因此决定：
+
+- override `selectSuggestion`；
+- 在调用 `super.selectSuggestion` 之前提交 selected file；
+- selection、`onChooseItem` fallback 和 `onClose` cancellation 共用一个
+  single-settlement guard；
+- callback 只能收到一次结果；
+- 不使用 arbitrary timeout 推迟 cancellation。
+
+真实取消仍由 `onClose` 提交 `null`；如果 selection 已经提交，close 和后续
+choose callback 都是 no-op。该修复不改变 capture-phase keyboard handling、
+retained target leaf、selection diagnostics 或 click interception。

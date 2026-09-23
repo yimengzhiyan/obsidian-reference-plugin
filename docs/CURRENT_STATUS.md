@@ -2,19 +2,34 @@
 
 ## Current phase
 
-**Phase:** Runtime selection-confirmation fix after Milestone 2 validation
+**Phase:** Runtime target-modal lifecycle fix after Milestone 2 validation
 
-**Branch:** `codex/runtime-selection-fix`
+**Branch:** `codex/modal-lifecycle-fix`
 
 **Environment:** Linux / Codex; dependencies already installed in the repository workspace
 
-Manual Obsidian validation found a real failure in the selection-confirmation
-path: after opening the target, selecting text, and pressing Enter, the selection
-collapsed and the workflow reported "Return to the selected target note before
-confirming." The click-interception architecture remains unchanged; this branch
-only fixes that runtime regression.
+After the selection timing fix, manual Obsidian validation found a second real
+failure: choosing a target opened it correctly, but the source placeholder and
+pending operation had already been removed. Enter then reported "Smart Reference
+operation state is missing." Runtime ordering shows the modal's `onClose` can run
+before `onChooseItem`, so the old `selected` flag incorrectly treated a real
+selection as cancellation.
 
 ## Implemented
+
+- `TargetNoteModal` now overrides the public `selectSuggestion` method and
+  settles the selected `FuzzyMatch<TFile>.item` before calling
+  `super.selectSuggestion`, which may close the modal.
+- Selection, cancellation, and fallback callback paths share a generic
+  `SingleSettlement<T>` guard. Exactly one selected file or `null` can reach the
+  workflow callback.
+- `onChooseItem` remains an idempotent API-compatible fallback; `onClose` only
+  cancels if selection has not already settled.
+- No timeout or delayed cancellation is used.
+- Three pure lifecycle tests cover select→close, close without selection, and
+  duplicate/late callback paths.
+
+The previous runtime selection fix remains intact:
 
 - Selection-mode Enter/Escape handling now runs in document capture phase, calls
   `preventDefault`/`stopPropagation` only while selection mode is active, and
@@ -54,13 +69,13 @@ The prior click-interception implementation remains implemented:
   highlight is used when exact rendered text cannot be resolved.
 - Reference persistence and lookup isolated in `src/reference-store.ts`.
 - Link detection and rendered-link annotation isolated in `src/links.ts`.
-- Ten automated core tests, including marker parsing, source-offset lookup,
+- Thirteen automated core tests, including modal settlement, marker parsing, source-offset lookup,
   known reference resolution, and missing reference behavior.
 - Updated manual test-Vault checklist in `README.md`.
 
 ## Validation performed
 
-- `npm test`: passed (10 tests).
+- `npm test`: passed (13 tests).
 - `npm run typecheck`: passed.
 - `npm run build`: passed; ignored `main.js` generated.
 - `git diff --check`: passed during implementation.
@@ -68,6 +83,13 @@ The prior click-interception implementation remains implemented:
 No new Obsidian UI claims have been marked manually verified in this environment.
 
 ## Manual validation still required
+
+- Re-run target selection and confirm modal close does not delete the source
+  placeholder or clear pending state before target selection mode begins.
+- Close the target picker with Escape and confirm cancellation removes the
+  placeholder exactly once.
+- Select with both keyboard Enter and mouse click; both paths must settle the
+  selected file exactly once.
 
 - Re-run the exact reproduced regression: target opens → mouse selection → Enter
   → selection captured → block ID created/reused → placeholder replaced → source
@@ -94,6 +116,13 @@ No new Obsidian UI claims have been marked manually verified in this environment
 
 ## API findings and limitations
 
+- Obsidian's public types expose `SuggestModal.selectSuggestion`, but do not
+  document the order of `onClose` versus `onChooseItem`. Real runtime behavior
+  demonstrated that `onClose` may occur first.
+- State needed to distinguish selection from cancellation must therefore be
+  committed in `selectSuggestion` before delegating to the base implementation;
+  an `onChooseItem`-only flag is too late.
+
 - Real runtime evidence shows `getActiveViewOfType(MarkdownView)` is not a
   sufficient identity anchor for this cross-note workflow. The leaf returned by
   `getLeaf(false)` and used by `openFile` must be retained and inspected directly.
@@ -118,6 +147,6 @@ No new Obsidian UI claims have been marked manually verified in this environment
 
 ## Next recommended step
 
-Install this branch into the same disposable Vault that reproduced the failure
-and run the selection-confirmation regression first. Only after it passes should
-the remaining Live Preview and Reading View click checklist continue.
+Install this branch into the same disposable Vault and repeat target selection by
+keyboard and mouse. Verify the placeholder survives modal close until Enter
+confirmation replaces it, then continue the remaining click checklist.

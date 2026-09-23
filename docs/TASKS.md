@@ -89,11 +89,15 @@
 - [x] 用户可以选择目标笔记
 - [x] 用户可以 Esc 取消
 - [x] 选择后可以打开目标笔记
+- [x] `selectSuggestion` 在 modal close 前提交 selected target
+- [x] selection / close / duplicate callbacks 使用 single-settlement guard
+- [x] modal lifecycle settlement pure tests
 
 ### Acceptance Criteria
 
 - [ ] 100+ 笔记下搜索仍可用
 - [ ] 选择后目标文件正确打开（已实现，待 Obsidian 手动验证）
+- [ ] Runtime regression: choose target → onClose does not cancel → pending/placeholder survive
 
 ---
 
