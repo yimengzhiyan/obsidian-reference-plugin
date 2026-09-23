@@ -702,3 +702,28 @@ whitespace 或 source locator）尚未从该 Vault 的日志确认。
 ID 的 paragraph/list item，再用允许空白折叠的 rendered text 搜索。无法唯一
 定位时继续安全地高亮 block，并记录 debug 日志，不再声称 exact 已高亮，
 也不向用户显示暗示原文已被修改的错误 Notice。Markdown 不作高亮修改。
+
+---
+
+## D-035 — Reading View 用顺序关联链接，并逐 Text node 包裹精确范围
+
+**Status:** Two real runtime failures observed; repair implemented, runtime revalidation pending
+
+用户验证 `click-runtime-fix` 后确认：Source 前后/无关编辑后的导航稳定，
+但 Reading View 对未改动的 target 总是高亮整个 block；修改 Wiki Link alias
+后 native link 仍导航，但增强高亮丢失。
+
+旧 Reading View `annotateRenderedSmartReferences` 首先按 target 寻找 anchor，
+但还要求 `candidate.textContent === alias`，且遍历的 source 列表只有 Smart
+Links。这既把显示文本变成关联的硬条件，也可能把普通同 target link 的 anchor
+借给 Smart Link。新决定是把**所有**当前 source Wiki Links 与 rendered anchors
+按 target 和同目标出现顺序配对；alias 仅在数量不一致且当前 alias 唯一匹配时
+作为保守回退。含糊时不加 metadata，原生 Wiki Block Link 继续生效。
+
+旧 `wrapText` 实际上已经逐 Text node 调用 `surroundContents`，所以不能把
+“总是 block fallback”直接归因于跨节点 `surroundContents` 异常：fallback
+表示没有成功找到/包裹任何 span；异常则会中断导航。具体 Obsidian DOM
+形态仍待复测。新实现把归一化文本 offset 映射到各 Text node，使用
+`splitText` 只包裹各节点的匹配部分，恢复时移除 wrapper；也允许 block ID
+anchor 紧邻 paragraph/list item 的渲染布局。无法唯一定位时仍只高亮 block，
+不修改 Markdown。这个实现和结果报告都需要真实 Reading View 回归确认。

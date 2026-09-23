@@ -371,8 +371,20 @@ of enhancement after unrelated Source edits. Native block navigation survived.
 - [x] Add debug distinctions for association, metadata, target, locator, and rendered fallback
 - [ ] Real-Obsidian: unchanged target highlights only selected phrase in Live Preview
 - [ ] Real-Obsidian: unchanged target highlights only selected phrase in Reading View
-- [ ] Real-Obsidian: Source edits before/after/elsewhere and alias change retain enhancement
+- [x] Real-Obsidian: Source edits before/after/elsewhere retain navigation (user validated)
+- [ ] Real-Obsidian: alias change retains enhanced highlight (reported broken; fix awaiting validation)
 - [ ] Real-Obsidian: confirm native link fallback with plugin disabled
+
+### Reading View runtime repair
+
+- [x] Map exact rendered offsets to individual Text nodes and wrap split nodes safely
+- [x] Preserve block highlight when exact rendered text cannot be wrapped
+- [x] Pair rendered anchors by target/order across ordinary and Smart Wiki Links
+- [x] Use current alias only as an unambiguous fallback if source/rendered counts differ
+- [x] Add pure multi-node and same-target/alias regression tests
+- [ ] Real-Obsidian: unchanged target highlights only selected words in Reading View
+- [ ] Real-Obsidian: edited alias retains enhancement in Reading View and Live Preview
+- [ ] Real-Obsidian: temporary spans are removed without altering rendered content
 
 Deliberately inserting text between the Wiki Link and `%%ref:id%%` breaks
 adjacency by design; the native Wiki Block Link remains valid.
