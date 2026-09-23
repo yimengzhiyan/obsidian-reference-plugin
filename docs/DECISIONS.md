@@ -546,3 +546,51 @@ Reading View 和插件禁用时的 fallback。
 disambiguation 和 block fallback，但尚未确认 hidden marker 与 rendered link 的
 最终 click association，也未建立 schema version/migration。因此该存储选择在
 Milestone 2 正式 data model 前仍为 provisional，不改变渐进增强原则。
+
+---
+
+## D-029 — 点击增强采用 Reading View post processor + capture click handler
+
+**Status:** Implemented; runtime validation pending
+
+没有发现公开的 Obsidian event 能在 Wiki Link click 时同时提供相邻隐藏
+comment 的 Markdown source context。因此采用分层方案：
+
+1. Reading View 通过公开 `registerMarkdownPostProcessor` 和
+   `getSectionInfo()` 读取当前 rendered section 的 source；
+2. parser 只识别紧邻的 `[[...]] %%ref:<id>%%`；
+3. post processor 将 ref ID 写到对应 rendered `a.internal-link` 的 data attribute；
+4. document capture-phase click handler 只增强带该 attribute 的 link；
+5. Live Preview link 使用 CodeMirror `posAtDOM` 回到 source offset，再运行同一 parser。
+
+选择 capture phase 是为了在已确认 metadata 和 target 都有效时先于 Obsidian
+native handler 执行精确跳转。以下情况不调用 `preventDefault`：
+
+- 普通 Wiki Link；
+- 无法找到相邻 marker；
+- ref ID 不存在于 store；
+- metadata target path 已不存在。
+
+因此 missing/stale 状态会继续执行 Obsidian 原生 Block Link。插件关闭时也没有
+handler/post processor，Markdown 仍是标准 Wiki Link。
+
+Reading View link/source association 当前通过 target、alias 和 occurrence order
+匹配。相同 target + alias 在同一 section 多次出现，以及包含混合 Markdown link
+的复杂 section，必须在 test Vault 中继续验证。
+
+---
+
+## D-030 — Editing 和 Reading View 使用不同的非持久高亮层
+
+**Status:** Implemented; runtime validation pending
+
+Editing / Live Preview 继续使用注册的 CM6 Decoration。Reading View 没有
+CodeMirror document，因此在目标 block 的 rendered DOM 中查找 exact text，
+临时包裹 text-node fragments 并在 timer 到期后还原 DOM。
+
+两条路径都不修改 Markdown。恢复只能得到 block 或 rendered exact text 无法
+唯一定位时，Reading View 高亮整个 block 作为安全 fallback。
+
+Obsidian 仍未公开从 `Editor` dispatch CM6 effect 的 API。`editor.cm` 和
+`posAtDOM` bridge 已集中隔离在 `src/navigation.ts`；bridge 不存在或 DOM node
+不属于 editor 时返回 null，而不是中断 native navigation。

@@ -153,7 +153,11 @@
 
 ---
 
-# Milestone 2 — Core Reference Data Model
+# Deferred roadmap milestone — Core Reference Data Model
+
+> Sequencing note: the reviewed Milestone 1 spike already provides the minimal
+> data model needed for navigation. The approved current Milestone 2 is Smart
+> Reference Click Interception below; full schema/versioning work remains deferred.
 
 ## Goal
 
@@ -315,7 +319,9 @@ Knowledge.md
 
 ---
 
-# Milestone 6 — Smart Reference Click Handling
+# Milestone 2 — Smart Reference Click Interception
+
+_Originally numbered roadmap Milestone 6; promoted by the approved development sequence._
 
 ## Goal
 
@@ -323,28 +329,31 @@ Knowledge.md
 
 ## Tasks
 
-- [ ] 确定 ref metadata 与链接的绑定机制
-- [ ] 识别 smart reference click
-- [ ] 不拦截普通 link
-- [ ] 打开 target file
-- [ ] 找 target block
-- [ ] 恢复 precise range
-- [ ] scroll into view
-- [ ] temporary highlight
-- [ ] highlight cleanup
-- [ ] recovery failure 时 fallback 到 block
+- [x] 确定 ref metadata 与链接的绑定机制
+- [x] 识别 smart reference click
+- [x] 不拦截普通 link
+- [x] missing ref / metadata / target 时保留 native click fallback
+- [x] 打开 target file
+- [x] 找 target block
+- [x] 恢复 precise range
+- [x] scroll into view
+- [x] temporary highlight
+- [x] highlight cleanup
+- [x] recovery failure 时 fallback 到 block
+- [x] 保留 manual highlight debug command
+- [x] 单元测试 marker parsing、reference lookup、missing reference
 
 ## View Modes
 
-- [ ] Live Preview
-- [ ] Reading View
-- [ ] Source Mode（至少确认兼容边界）
+- [ ] Live Preview（实现完成，待 Obsidian 手动验证）
+- [ ] Reading View（实现完成，待 Obsidian 手动验证）
+- [x] Source Mode compatibility boundary documented; raw-source links are not intercepted
 
 ## Acceptance Criteria
 
-- [ ] 普通链接仍使用正常 Obsidian 行为
-- [ ] Smart Reference 使用增强行为
-- [ ] 插件关闭后 link 仍可用
+- [x] 普通链接未被 handler preventDefault（自动化/代码审查；待 UI 回归）
+- [ ] Smart Reference 使用增强行为（待 Obsidian 手动验证）
+- [ ] 插件关闭后 link 仍可用（表示保持 native Wiki Link；待手动验证）
 
 ---
 
