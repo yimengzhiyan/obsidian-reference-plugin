@@ -59,19 +59,23 @@ Obsidian's native link handler.
 These remain technical-spike commands, not the final four-level user experience.
 Use a disposable test Vault. Current manual checks are:
 
-1. Create a reference to text inside a normal paragraph and confirm the source
+1. Run the exact selection-confirmation regression:
+   `Target opens → select text → Enter → selection is captured before editor
+   mutation → block ID is created/reused → source placeholder is replaced →
+   workflow returns to the source note`.
+2. Create a reference to text inside a normal paragraph and confirm the source
    receives a native `[[Note#^block-id|Alias]]` plus hidden ref marker.
-2. Repeat with an existing block ID and confirm no duplicate is added.
-3. Cancel from the picker and from the target note; confirm the source has no
+3. Repeat with an existing block ID and confirm no duplicate is added.
+4. Cancel from the picker and from the target note; confirm the source has no
    orphan placeholder.
-4. In Live Preview, click a generated Smart Reference; confirm its target opens,
+5. In Live Preview, click a generated Smart Reference; confirm its target opens,
    the exact text scrolls into view, and the temporary highlight disappears.
-5. Repeat selection with a simple list item and record whether native block
+6. Repeat selection with a simple list item and record whether native block
    navigation resolves correctly in the installed Obsidian version.
-6. In Reading View, click a generated Smart Reference and confirm the rendered
+7. In Reading View, click a generated Smart Reference and confirm the rendered
    target text is temporarily highlighted without changing Markdown.
-7. Run the manual highlight command and confirm it still follows the same path.
-8. Temporarily disable the plugin and click the same link; confirm Obsidian still
+8. Run the manual highlight command and confirm it still follows the same path.
+9. Temporarily disable the plugin and click the same link; confirm Obsidian still
    opens the native block target.
-9. With the plugin enabled, delete the stored reference or move its target and
+10. With the plugin enabled, delete the stored reference or move its target and
    confirm the click falls through to native navigation without an exception.

@@ -5,6 +5,7 @@ import { locateReference } from "../src/locator.ts";
 import { findSmartReferenceAtOffset, parseSmartReferenceLinks } from "../src/links.ts";
 import type { PreciseReference } from "../src/model.ts";
 import { resolveReferenceById } from "../src/reference-store.ts";
+import { resolveSelectionContext } from "../src/selection-context.ts";
 import { findUniqueTextRange } from "../src/text-ranges.ts";
 
 test("placeholder lookup requires exactly one token", () => {
@@ -97,6 +98,41 @@ test("reference lookup resolves known IDs and safely reports missing IDs", () =>
   const references = { known: reference };
   assert.equal(resolveReferenceById(references, "known"), reference);
   assert.equal(resolveReferenceById(references, "missing"), null);
+});
+
+test("selection context prefers the retained target leaf and falls back to the active target", () => {
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", "Target.md", "Other.md"), {
+    kind: "ready",
+    source: "active",
+  });
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", null, "Target.md"), {
+    kind: "ready",
+    source: "retained",
+  });
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", "Other.md", "Target.md"), {
+    kind: "ready",
+    source: "retained",
+  });
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", "Target.md", "Target.md"), {
+    kind: "ready",
+    source: "retained",
+  });
+});
+
+test("selection context reports distinct runtime failure causes", () => {
+  assert.deepEqual(resolveSelectionContext(false, "Target.md", "Target.md", "Target.md"), {
+    kind: "missing-pending",
+  });
+  assert.deepEqual(resolveSelectionContext(true, null, "Target.md", "Target.md"), {
+    kind: "missing-expected-target",
+  });
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", null, null), {
+    kind: "no-markdown-view",
+  });
+  assert.deepEqual(resolveSelectionContext(true, "Target.md", "Other.md", "Elsewhere.md"), {
+    kind: "wrong-active-target",
+    actualPath: "Other.md",
+  });
 });
 
 function makeReference(overrides: Partial<PreciseReference>): PreciseReference {

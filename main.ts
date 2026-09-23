@@ -1,4 +1,13 @@
-import { Editor, FuzzySuggestModal, MarkdownFileInfo, MarkdownView, Notice, Plugin, TFile } from "obsidian";
+import {
+  Editor,
+  FuzzySuggestModal,
+  MarkdownFileInfo,
+  MarkdownView,
+  Notice,
+  Plugin,
+  TFile,
+  WorkspaceLeaf,
+} from "obsidian";
 import { ensureBlockId } from "./src/blocks.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
@@ -13,6 +22,7 @@ import {
 } from "./src/navigation.ts";
 import type { PendingReference, PreciseReference } from "./src/model.ts";
 import { ReferenceStore } from "./src/reference-store.ts";
+import { resolveSelectionContext } from "./src/selection-context.ts";
 import { findUniqueTextRange } from "./src/text-ranges.ts";
 
 const CONTEXT_LENGTH = 32;
@@ -21,6 +31,7 @@ export default class ReferencePlugin extends Plugin {
   private store!: ReferenceStore;
   private navigator!: SmartReferenceNavigator;
   private selectionTargetPath: string | null = null;
+  private selectionTargetLeaf: WorkspaceLeaf | null = null;
   private selectionStatus: HTMLElement | null = null;
 
   async onload(): Promise<void> {
@@ -28,7 +39,9 @@ export default class ReferencePlugin extends Plugin {
     this.navigator = new SmartReferenceNavigator(this.app);
     await this.store.load();
     this.registerEditorExtension(preciseHighlightField);
-    this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event));
+    this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event), {
+      capture: true,
+    });
     this.registerDomEvent(document, "click", (event) => void this.handleSmartReferenceClick(event), {
       capture: true,
     });
@@ -88,12 +101,23 @@ export default class ReferencePlugin extends Plugin {
     const pending = this.store.pending;
     if (!pending) return;
     await this.store.updatePendingTarget(file.path);
-    await this.app.workspace.getLeaf(false).openFile(file);
-    this.enterSelectionMode(file.path);
+    const targetLeaf = this.app.workspace.getLeaf(false);
+    await targetLeaf.openFile(file);
+    this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
+    if (!(targetLeaf.view instanceof MarkdownView)) {
+      console.debug("[Smart Reference] Target leaf did not resolve to MarkdownView", {
+        expectedTargetPath: file.path,
+        viewType: targetLeaf.view.getViewType(),
+      });
+      new Notice("Target note opened without an editable Markdown view. Cancel and try again.");
+      return;
+    }
+    this.enterSelectionMode(file.path, targetLeaf);
   }
 
-  private enterSelectionMode(targetPath: string): void {
+  private enterSelectionMode(targetPath: string, targetLeaf: WorkspaceLeaf): void {
     this.selectionTargetPath = targetPath;
+    this.selectionTargetLeaf = targetLeaf;
     this.selectionStatus = this.addStatusBarItem();
     this.selectionStatus.setText("Smart Reference: select text, Enter to confirm, Esc to cancel");
     new Notice("Select text in the target note, then press Enter. Esc cancels.", 5_000);
@@ -101,6 +125,7 @@ export default class ReferencePlugin extends Plugin {
 
   private exitSelectionMode(): void {
     this.selectionTargetPath = null;
+    this.selectionTargetLeaf = null;
     this.selectionStatus?.remove();
     this.selectionStatus = null;
   }
@@ -115,11 +140,22 @@ export default class ReferencePlugin extends Plugin {
 
   private async confirmSelection(): Promise<void> {
     const pending = this.store.pending;
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!pending || !view?.file || view.file.path !== this.selectionTargetPath) {
-      new Notice("Return to the selected target note before confirming.");
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const retainedView = this.selectionTargetLeaf?.view instanceof MarkdownView
+      ? this.selectionTargetLeaf.view
+      : null;
+    const context = resolveSelectionContext(
+      pending !== null,
+      this.selectionTargetPath,
+      activeView?.file?.path ?? null,
+      retainedView?.file?.path ?? null,
+    );
+    if (context.kind !== "ready") {
+      this.reportSelectionContextFailure(context, activeView, retainedView);
       return;
     }
+    const view = context.source === "active" ? activeView : retainedView;
+    if (!pending || !view?.file) return;
 
     const editor = view.editor;
     const selectedText = editor.getSelection();
@@ -163,6 +199,30 @@ export default class ReferencePlugin extends Plugin {
     const sourceFile = this.app.vault.getAbstractFileByPath(pending.sourcePath);
     if (sourceFile instanceof TFile) await this.app.workspace.getLeaf(false).openFile(sourceFile);
     new Notice("Precise reference created. Use the highlight spike command to validate navigation.");
+  }
+
+  private reportSelectionContextFailure(
+    context: Exclude<ReturnType<typeof resolveSelectionContext>, { kind: "ready" }>,
+    activeView: MarkdownView | null,
+    retainedView: MarkdownView | null,
+  ): void {
+    console.debug("[Smart Reference] Selection confirmation context failure", {
+      reason: context.kind,
+      expectedTargetPath: this.selectionTargetPath,
+      activeTargetPath: activeView?.file?.path ?? null,
+      retainedTargetPath: retainedView?.file?.path ?? null,
+      pendingOperationId: this.store.pending?.id ?? null,
+    });
+
+    if (context.kind === "missing-pending") {
+      new Notice("Smart Reference operation state is missing. Cancel and start again.");
+    } else if (context.kind === "missing-expected-target") {
+      new Notice("Smart Reference target state is missing. Cancel and start again.");
+    } else if (context.kind === "no-markdown-view") {
+      new Notice("No active Markdown editor is available for the selected target.");
+    } else {
+      new Notice("The active note is not the selected Smart Reference target.");
+    }
   }
 
   private async replacePendingPlaceholder(pending: PendingReference, replacement: string): Promise<boolean> {
