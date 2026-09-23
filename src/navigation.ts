@@ -9,6 +9,7 @@ import { classifyHighlightResult, type NavigationResult } from "./navigation-res
 const HIGHLIGHT_DURATION_MS = 4_000;
 
 type AppliedHighlight = { kind: "exact" | "block"; cleanup: () => void };
+type RenderedWrapResult = { spans: HTMLElement[]; fallbackReason: string | null };
 
 export class SmartReferenceNavigator {
   private clearHighlight: (() => void) | null = null;
@@ -102,35 +103,62 @@ async function highlightReadingView(
   reference: PreciseReference,
   location: Exclude<LocateResult, { kind: "missing-block" }>,
 ): Promise<AppliedHighlight | null> {
-  await nextAnimationFrame();
-  const preview = view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
-  if (!preview) return null;
-  const escapedId = CSS.escape(reference.blockId);
-  const idElement = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
-  if (!idElement) return null;
-  const block = readingBlockForId(idElement);
-
-  if (location.kind === "block-only") {
-    block.classList.add("smart-ref-reading-highlight");
-    block.scrollIntoView({ block: "center" });
-    return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
-  }
-
-  const spans = wrapText(block, reference.selectedText, reference.prefix, reference.suffix);
-  if (spans.length === 0) {
-    console.debug("[Smart Reference] rendered exact text unavailable; using block highlight", {
+  console.debug("[Smart Reference] Reading View reference", {
+    refId: reference.refId,
+    blockId: reference.blockId,
+    selectedText: reference.selectedText,
+    prefix: reference.prefix,
+    suffix: reference.suffix,
+    locatorKind: location.kind,
+  });
+  try {
+    await nextAnimationFrame();
+    const preview = view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
+    if (!preview) {
+      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "preview-missing" });
+      return null;
+    }
+    const escapedId = CSS.escape(reference.blockId);
+    const idElement = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
+    if (!idElement) {
+      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "block-id-element-missing" });
+      return null;
+    }
+    const block = readingBlockForId(idElement);
+    console.debug("[Smart Reference] Reading View target block", {
       refId: reference.refId,
-      selectedText: reference.selectedText,
-      renderedText: block.textContent,
+      idElementTag: idElement.tagName,
+      idElementClass: idElement.className,
+      idElementText: idElement.textContent,
+      blockTag: block.tagName,
+      blockClass: block.className,
+      textContent: block.textContent,
+      innerText: block.innerText,
     });
-    block.classList.add("smart-ref-reading-highlight");
-    block.scrollIntoView({ block: "center" });
-    return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
+
+    if (location.kind === "block-only") {
+      block.classList.add("smart-ref-reading-highlight");
+      block.scrollIntoView({ block: "center" });
+      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason: "source-locator-block-only" });
+      return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
+    }
+
+    const { spans, fallbackReason } = wrapText(block, reference);
+    if (spans.length === 0) {
+      block.classList.add("smart-ref-reading-highlight");
+      block.scrollIntoView({ block: "center" });
+      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason });
+      return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
+    }
+    spans[0].scrollIntoView({ block: "center" });
+    console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "exact", exactHighlightSuccess: true, fallbackReason: null, wrappedSpanCount: spans.length });
+    return { kind: "exact", cleanup: () => {
+      unwrapTextSpans(block, spans);
+    } };
+  } catch (error) {
+    console.debug("[Smart Reference] Reading View exception", { refId: reference.refId, error });
+    throw error;
   }
-  spans[0].scrollIntoView({ block: "center" });
-  return { kind: "exact", cleanup: () => {
-    unwrapTextSpans(block, spans);
-  } };
 }
 
 function readingBlockForId(idElement: HTMLElement): HTMLElement {
@@ -144,7 +172,7 @@ function readingBlockForId(idElement: HTMLElement): HTMLElement {
   return idElement;
 }
 
-function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffix: string): HTMLElement[] {
+function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapResult {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   let combined = "";
@@ -153,10 +181,46 @@ function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffi
     nodes.push(node);
     combined += node.data;
   }
-  const found = findRenderedTextRange(combined, selectedText, prefix, suffix);
-  if (!found) return [];
+  console.debug("[Smart Reference] Reading View text nodes", {
+    refId: reference.refId,
+    count: nodes.length,
+    nodes: nodes.map((node, index) => ({ index, textContent: node.textContent })),
+  });
+  const found = findRenderedTextRange(combined, reference.selectedText, reference.prefix, reference.suffix);
+  const normalizedSelectedText = reference.selectedText.replace(/\s+/gu, " ").trim();
+  const normalizedRenderedText = combined.replace(/\s+/gu, " ");
+  const candidateStarts: number[] = [];
+  if (normalizedSelectedText) {
+    let cursor = 0;
+    while (cursor <= normalizedRenderedText.length) {
+      const index = normalizedRenderedText.indexOf(normalizedSelectedText, cursor);
+      if (index < 0) break;
+      candidateStarts.push(index);
+      cursor = index + normalizedSelectedText.length;
+    }
+  }
+  console.debug("[Smart Reference] Reading View match", {
+    refId: reference.refId,
+    normalizedSelectedText,
+    normalizedRenderedText,
+    candidateStarts,
+    matchedStart: found?.from ?? null,
+    matchedEnd: found?.to ?? null,
+    positionUnit: "UTF-16 offset in concatenated DOM text nodes",
+    domRangeCreated: false,
+    wrappingMethod: "splitText",
+  });
+  if (!found) {
+    const fallbackReason = nodes.length === 0 ? "no-text-nodes"
+      : !normalizedSelectedText ? "empty-selected-text"
+      : candidateStarts.length === 0 ? "rendered-text-no-match"
+      : "rendered-text-ambiguous-match";
+    return { spans: [], fallbackReason };
+  }
   const spans: HTMLElement[] = [];
   const segments = mapTextRangeToSegments(nodes.map((node) => node.data), found);
+  console.debug("[Smart Reference] Reading View segments", { refId: reference.refId, segments });
+  if (segments.length === 0) return { spans, fallbackReason: "matched-range-has-no-text-segments" };
   try {
     for (const segment of segments) {
       const node = nodes[segment.nodeIndex];
@@ -171,11 +235,11 @@ function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffi
       spans.push(span);
     }
   } catch (error) {
-    console.debug("[Smart Reference] rendered text wrapping failed", error);
+    console.debug("[Smart Reference] Reading View wrapping exception", { refId: reference.refId, error });
     unwrapTextSpans(root, spans);
-    return [];
+    return { spans: [], fallbackReason: "text-node-wrapping-exception" };
   }
-  return spans;
+  return { spans, fallbackReason: null };
 }
 
 function unwrapTextSpans(root: HTMLElement, spans: HTMLElement[]): void {

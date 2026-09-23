@@ -386,6 +386,13 @@ of enhancement after unrelated Source edits. Native block navigation survived.
 - [ ] Real-Obsidian: edited alias retains enhancement in Reading View and Live Preview
 - [ ] Real-Obsidian: temporary spans are removed without altering rendered content
 
+### Reading View exact-highlight diagnosis
+
+- [x] Add temporary logs for reference metadata, chosen rendered block, Text nodes, normalized matching, mapped segments, result, fallback reason, and exceptions
+- [ ] Capture the new logs from a real Reading View click in the disposable Vault
+- [ ] Confirm the specific root cause of whole-block fallback from those logs
+- [ ] Make a separate focused repair and remove temporary debug logging
+
 Deliberately inserting text between the Wiki Link and `%%ref:id%%` breaks
 adjacency by design; the native Wiki Block Link remains valid.
 

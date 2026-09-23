@@ -57,10 +57,10 @@ resolved. Ordinary Wiki Links and unresolved Smart References are left to
 Obsidian's native link handler.
 
 These remain technical-spike commands, not the final four-level user experience.
-The creation flow and navigation after ordinary Source edits have been manually
-validated. Reading View exact-highlight and alias-association fixes on this
-branch still require a test-Vault run. Open the developer console and filter
-for `[Smart Reference]` if enhancement falls through or highlights a block.
+The creation flow and navigation after Source and alias edits have been manually
+validated. Reading View still highlights the whole paragraph when exact text
+was expected. This branch adds temporary diagnostic logs; open the developer
+console and filter for `[Smart Reference] Reading View` when reproducing it.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:

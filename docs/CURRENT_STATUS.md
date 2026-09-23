@@ -2,71 +2,34 @@
 
 ## Current phase
 
-**Phase:** Focused Reading View exact-highlight and alias-association repair
+**Phase:** Diagnose Reading View exact-highlight fallback
 
-**Branch:** `codex/render-highlight-fix`
+**Branch:** `codex/debug-render-highlight` (from `codex/render-highlight-fix`)
 
-**Environment:** Linux/Codex; Obsidian runtime validation is performed by the user in a disposable Vault
+**Environment:** Linux/Codex; the user validates Obsidian behavior in a disposable Vault
 
-The creation workflow is manually validated. The user also validated that
-click navigation reaches the correct target and remains stable after inserting
-text before/after a Source reference and editing unrelated Source text.
+Smart Reference creation, click navigation, navigation after Source edits, navigation after alias edits, and block highlighting are manually validated. Clicking a Smart Reference in Reading View still highlights the whole paragraph rather than only the selected text. This branch adds temporary diagnostics only; the existing fallback remains.
 
-Two real runtime problems remain on the prior branch:
+## Diagnostic instrumentation
 
-1. Reading View clicks scroll to the correct block but always highlight the
-   whole paragraph, even when the target text is unchanged.
-2. Editing the Wiki Link alias leaves native navigation working but loses the
-   Smart Reference enhancement.
+`src/navigation.ts` now logs each Reading View attempt under `[Smart Reference] Reading View`:
 
-## Implemented on this branch
+- `reference`: refId, blockId, selectedText, prefix, suffix, and source locator kind.
+- `target block`: block-ID element and chosen block tags/classes, block `textContent`, and `innerText`.
+- `text nodes`: count and each collected Text node's content.
+- `match`: normalized selected/rendered text, candidate starts, matched start/end offsets, and whether a DOM Range was created. The current implementation uses `splitText`, so `domRangeCreated` is always false.
+- `segments` and `result`: mapped Text node portions, exact success, or a specific fallback reason. Exceptions are logged with their refId.
 
-- Reading View exact highlighting maps normalized rendered-text offsets to
-  individual text nodes, splits only the matching portions, wraps each portion
-  independently, and restores the DOM after the timer. It no longer calls
-  `Range.surroundContents`. An adjacent paragraph/list item is considered when
-  Obsidian renders the block-ID anchor beside, rather than inside, the block.
-  Unmatched or failed wrapping still falls back to block highlighting.
-- Reading View annotation pairs *all* current source Wiki Links, including
-  ordinary links, with rendered anchors by target and same-target order.
-  Display text is not the primary identity. If counts differ, a unique current
-  alias can associate a link; ambiguous cases retain native navigation.
-- Pure tests cover changed aliases, unrelated edits, ordinary/ambiguous
-  same-target links, and exact text split across rendered text nodes.
-
-The native `[[Target#^block|Alias]] %%ref:id%%` representation, Live Preview
-association, manual highlight command, modal single-settlement, retained leaf,
-and capture-phase selection handling are unchanged.
+The source locator can return `block-only` before any rendered-text matching. When it returns `exact`, the rendered wrapper can fall back because the chosen DOM block has no matching text, the match is ambiguous, mapping yields no segments, or wrapping throws. Static inspection cannot distinguish the actual Obsidian failure; a runtime console capture is required. In particular, a block-ID element outside the paragraph may cause `readingBlockForId` to select a DOM scope that does not contain the selected words, but this remains a hypothesis.
 
 ## Verification
 
-- `npm test`: 22 pure tests passed.
+- `npm test`: 22 tests passed.
 - `npm run typecheck`: passed.
 - `npm run build`: passed; generated `main.js` is ignored.
 - `git diff --check`: passed.
-- This branch has **not** yet been manually run in Obsidian. The runtime findings
-  above describe the prior branch, not a claimed validation of this fix.
+- No real Obsidian run is available in this environment, so the exact runtime root cause is unconfirmed.
 
-## Technical finding and remaining risk
+## Next step
 
-Static code inspection shows that the old `wrapText()` already created a
-separate `Range` for each Text node. A whole-block fallback required it to
-return no spans, most likely because rendered text was not found in the chosen
-DOM scope; a cross-element `surroundContents()` exception would instead have
-interrupted navigation. The exact Obsidian DOM mismatch is still unconfirmed.
-The new segment mapping and adjacent-block lookup address likely causes and
-make wrapping safer, but the user must repeat the real Reading View case.
-
-Reading View post-processing depends on Obsidian's section source and rendered
-anchor order. Mixed Markdown/Wiki links or a plugin that inserts extra anchors
-can make counts differ; unique alias fallback is allowed, ambiguity falls
-through to native navigation. No settings, metadata hiding, alias UI, or
-rename/move handling was added.
-
-## Next recommended step
-
-Install this branch in the same disposable Vault. Re-test unchanged-target
-Reading View exact highlighting, alias edits in both views, normal Source edits,
-temporary cleanup, and plugin-disabled native fallback. Capture the
-`[Smart Reference]` locator and rendered-text debug output if block fallback
-still occurs.
+Install this branch in the disposable Vault, open the developer console, and click one unchanged Smart Reference in Reading View. Capture the `[Smart Reference] target locator` and all `[Smart Reference] Reading View` entries for that click. Use the first failure reason and the logged block/text nodes to identify the exact mismatch, then make a separate focused fix. Remove the temporary logging after diagnosis.
