@@ -20,7 +20,24 @@ interface WikiLink extends Omit<SmartReferenceLink, "refId"> {
 }
 
 const WIKI_LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
-const REF_MARKER_PATTERN = /^[ \t]*%%ref:([A-Za-z0-9_-]+)%%/;
+const REF_MARKER_PATTERN = /^[ \t]*(?:<!--smart-ref:([A-Za-z0-9_-]+)-->|%%ref:([A-Za-z0-9_-]+)%%)/;
+
+/** Keep the reference marker in the same Markdown paragraph as its link. */
+export function buildSmartReferenceLink(path: string, blockId: string, selectedText: string, refId: string): string {
+  const target = path.replace(/\.md$/i, "");
+  const alias = selectedText.replace(/\r?\n/g, " ").replace(/\|/g, "\\|");
+  return `[[${target}#^${blockId}|${alias}]]<!--smart-ref:${refId}-->`;
+}
+
+export function parseSmartReferenceComment(comment: string): string | null {
+  return /^smart-ref:([A-Za-z0-9_-]+)$/.exec(comment)?.[1] ?? null;
+}
+
+function adjacentCommentRefId(anchor: HTMLAnchorElement): string | null {
+  let sibling = anchor.nextSibling;
+  while (sibling?.nodeType === 3 && !sibling.textContent?.trim()) sibling = sibling.nextSibling;
+  return sibling?.nodeType === 8 ? parseSmartReferenceComment(sibling.textContent ?? "") : null;
+}
 
 export function parseSmartReferenceLinks(source: string): SmartReferenceLink[] {
   return parseWikiLinks(source).filter((link): link is SmartReferenceLink => link.refId !== null);
@@ -41,7 +58,7 @@ function parseWikiLinks(source: string): WikiLink[] {
       linktext,
       target,
       alias,
-      refId: marker?.[1] ?? null,
+      refId: marker?.[1] ?? marker?.[2] ?? null,
     });
   }
   return links;
@@ -89,7 +106,8 @@ export function annotateRenderedSmartReferences(
     target: anchor.dataset.href || anchor.getAttribute("href") || "",
   }));
   const refIds = resolveRenderedReferenceIds(source, identities, resolvePath);
-  for (const [index, refId] of refIds.entries()) {
+  for (const [index, sourceRefId] of refIds.entries()) {
+    const refId = adjacentCommentRefId(anchors[index]) ?? sourceRefId;
     if (refId) anchors[index].setAttribute(SMART_REF_ATTRIBUTE, refId);
     else anchors[index].removeAttribute(SMART_REF_ATTRIBUTE);
   }

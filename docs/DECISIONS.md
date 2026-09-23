@@ -769,3 +769,14 @@ result back to Text nodes. Wrap a DOM Range contained within each matched Text
 node, preserving surrounding inline elements. Exact matching failure retains the
 container highlight; unavailable/ambiguous containers cannot receive a safe block
 fallback. Source metadata, link annotation, and selection remain unchanged.
+
+
+## D-038 — Adjacent HTML comment stores link/refId association
+
+Generate `[[Target#^block|alias]]<!--smart-ref:uuid-->` as one Markdown paragraph.
+Keep existing reference metadata unchanged. Parse adjacent HTML comments and retain
+legacy same-line percent-comment compatibility. Reading View uses the immediate
+DOM comment if retained, with section-source association as fallback when rendering
+filters comments. Alias is never identity. This supersedes the generated percent
+marker syntax from D-029. Detached legacy paragraphs require explicit relocation;
+no automatic migration guesses which link owns them. Real Obsidian validation pending.

@@ -638,3 +638,12 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Preserve paragraph fallback and add container/range diagnostics
 - [x] Tests for mid-paragraph substring, source edits, whitespace, ambiguity, and fallback
 - [ ] Real Obsidian: exact highlight, alias/source edits, formatting, and timed cleanup
+
+
+## Reference marker redesign
+
+- [x] Generate adjacent invisible HTML comment markers
+- [x] Parse new markers and legacy same-line markers
+- [x] Reading View DOM comment annotation plus section-source fallback
+- [x] Tests for alias/source edits and stripped comments
+- [ ] Real Obsidian: new creation, invisible marker, annotation, alias/source edits

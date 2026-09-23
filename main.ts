@@ -13,6 +13,7 @@ import { ensureBlockId } from "./src/blocks.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
+  buildSmartReferenceLink,
   resolveLivePreviewReference,
 } from "./src/links.ts";
 import {
@@ -50,16 +51,17 @@ export default class ReferencePlugin extends Plugin {
       const firstLink = element.querySelector<HTMLElement>("a[href], a.internal-link");
       if (!firstLink) return;
       const section = context.getSectionInfo(element) ?? context.getSectionInfo(firstLink);
+      // HTML comments may survive rendering even when section source is unavailable.
+      annotateRenderedSmartReferences(element, section?.text ?? "", (path) =>
+        this.app.metadataCache.getFirstLinkpathDest(path, context.sourcePath)?.path ?? path
+      );
       if (!section) {
-        console.debug("[Smart Reference] Reading View annotation skipped: section unavailable", {
+        console.debug("[Smart Reference] Reading View annotation: DOM comments only; section unavailable", {
           sourcePath: context.sourcePath,
         });
         return;
       }
-      annotateRenderedSmartReferences(element, section.text, (path) =>
-        this.app.metadataCache.getFirstLinkpathDest(path, context.sourcePath)?.path ?? path
-      );
-      if (section.text.includes("%%ref:")) {
+      if (section.text.includes("<!--smart-ref:") || section.text.includes("%%ref:")) {
         console.debug("[Smart Reference] Reading View link annotation", {
           sourcePath: context.sourcePath,
           lineStart: section.lineStart,
@@ -420,9 +422,7 @@ class TargetNoteModal extends FuzzySuggestModal<TFile> {
 }
 
 function buildPreciseLink(file: TFile, reference: PreciseReference): string {
-  const path = file.path.replace(/\.md$/i, "");
-  const alias = reference.selectedText.replace(/\r?\n/g, " ").replace(/\|/g, "\\|");
-  return `[[${path}#^${reference.blockId}|${alias}]] %%ref:${reference.refId}%%`;
+  return buildSmartReferenceLink(file.path, reference.blockId, reference.selectedText, reference.refId);
 }
 
 function createBlockId(): string {

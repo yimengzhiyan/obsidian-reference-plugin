@@ -4,6 +4,9 @@ import test from "node:test";
 import { ensureBlockId, findBlockById, findContainingBlock } from "../src/blocks.ts";
 import { locateReference } from "../src/locator.ts";
 import {
+  annotateRenderedSmartReferences,
+  buildSmartReferenceLink,
+  parseSmartReferenceComment,
   findSmartReferenceAtOffset,
   parseSmartReferenceLinks,
   resolveLivePreviewReference,
@@ -332,4 +335,53 @@ test("Reading View keeps a paragraph fallback when selected text no longer match
   assert.equal(findRenderedBlockIndex(rendered, [rendered]), 0);
   assert.equal(findRenderedTextRange(rendered, "chosen words", "Prefix ", " suffix"), null);
   assert.equal(sourceBlockMarkdown("Text **formatted** here ^sr-id"), "Text **formatted** here");
+});
+
+
+test("new references generate an adjacent invisible HTML marker and round-trip", () => {
+  const source = buildSmartReferenceLink("Folder/Target.md", "block-1", "chosen words", "uuid-1");
+  assert.equal(source, "[[Folder/Target#^block-1|chosen words]]<!--smart-ref:uuid-1-->");
+  const parsed = parseSmartReferenceLinks(source);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].refId, "uuid-1");
+  assert.equal(parsed[0].to, source.length);
+  assert.equal(parseSmartReferenceComment("smart-ref:uuid-1"), "uuid-1");
+  assert.equal(parseSmartReferenceComment("smart-ref:bad id"), null);
+});
+
+test("HTML markers survive alias and surrounding Source edits in both association paths", () => {
+  const target = "Target#^block-1";
+  for (const alias of ["original", "new alias", "中文别名"]) {
+    const line = `Before [[${target}|${alias}]]<!--smart-ref:uuid--> after`;
+    assert.equal(resolveLivePreviewReference(`Introduction\n${line}`, target, line, 0, 1), "uuid");
+    assert.deepEqual(resolveRenderedReferenceIds(line, [{ target }]), ["uuid"]);
+  }
+  assert.deepEqual(resolveRenderedReferenceIds(`[[${target}|ordinary]] [[${target}|new alias]]<!--smart-ref:uuid-->`, [{ target }, { target }]), [null, "uuid"]);
+});
+
+test("parser rejects detached HTML markers while retaining same-line legacy references", () => {
+  for (const gap of ["\n\n", " inserted "]) {
+    assert.deepEqual(parseSmartReferenceLinks(`[[Target#^block|alias]]${gap}<!--smart-ref:uuid-->`), []);
+  }
+  assert.equal(parseSmartReferenceLinks("[[Target#^block|alias]] %%ref:old%%")[0].refId, "old");
+});
+
+test("annotation uses DOM comments without section source and source when comments are stripped", () => {
+  // Minimal DOM boundary fixture: exercise annotation without importing Obsidian.
+  const attrs = new Map<string, string>();
+  const anchor = {
+    dataset: { href: "Target#^block" },
+    nextSibling: { nodeType: 8, textContent: "smart-ref:uuid" } as object | null,
+    getAttribute: () => "Target#^block",
+    setAttribute: (key: string, value: string) => attrs.set(key, value),
+    removeAttribute: (key: string) => attrs.delete(key),
+  };
+  const root = { querySelectorAll: () => [anchor] } as unknown as HTMLElement;
+  annotateRenderedSmartReferences(root, "");
+  assert.equal(attrs.get("data-smart-ref-id"), "uuid");
+  anchor.nextSibling = null;
+  annotateRenderedSmartReferences(root, "[[Target#^block|edited]]<!--smart-ref:uuid-->");
+  assert.equal(attrs.get("data-smart-ref-id"), "uuid");
+  annotateRenderedSmartReferences(root, "[[Target#^block|ordinary]]");
+  assert.equal(attrs.has("data-smart-ref-id"), false);
 });

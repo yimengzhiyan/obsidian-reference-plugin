@@ -52,7 +52,7 @@ Use a dedicated test Vault rather than a production Vault:
   after navigation or plugin reload.
 
 Clicking a generated Smart Reference now triggers enhanced navigation in Live
-Preview and Reading View when its adjacent `%%ref:<id>%%` metadata can be
+Preview and Reading View when its adjacent `<!--smart-ref:<id>-->` metadata can be
 resolved. Ordinary Wiki Links and unresolved Smart References are left to
 Obsidian's native link handler.
 
@@ -101,3 +101,11 @@ Use a disposable test Vault. Current manual checks are:
 11. Deliberately insert non-whitespace text between the Wiki Link and its
     `%%ref:id%%` marker. Enhanced association should stop, while the native
     block link should continue to navigate. Restore adjacency afterward.
+
+## Reference marker format
+
+New references use `[[Target#^block|alias]]<!--smart-ref:uuid-->`. Keep the comment
+beside the link; it is invisible in Reading View. Alias edits preserve identity.
+Legacy same-line `%%ref:id%%` remains readable. Old markers in separate paragraphs
+must be moved beside their corresponding links; reuse the same refId. The plugin
+preserves the existing reference store and does not migrate note content automatically.
