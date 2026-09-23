@@ -6,11 +6,12 @@ import {
   findSmartReferenceAtOffset,
   parseSmartReferenceLinks,
   resolveLivePreviewReference,
+  resolveRenderedReferenceIds,
 } from "../src/links.ts";
 import type { PreciseReference } from "../src/model.ts";
 import { classifyHighlightResult } from "../src/navigation-result.ts";
 import { resolveReferenceById } from "../src/reference-store.ts";
-import { findRenderedTextRange } from "../src/rendered-text.ts";
+import { findRenderedTextRange, mapTextRangeToSegments } from "../src/rendered-text.ts";
 import { resolveSelectionContext } from "../src/selection-context.ts";
 import { SingleSettlement } from "../src/single-settlement.ts";
 import { findUniqueTextRange } from "../src/text-ranges.ts";
@@ -132,6 +133,35 @@ test("text inserted between Wiki Link and marker breaks the intentional adjacenc
   assert.equal(resolveLivePreviewReference(source, "Target#^block-1", source, 0, 1), null);
 });
 
+test("Reading View pairing survives alias and unrelated Source edits", () => {
+  const target = "Target#^block-1";
+  const link = `[[${target}|New display text]] %%ref:ref-1%%`;
+  for (const source of [link, `Intro ${link} tail`, `Other paragraph changed\n${link}`]) {
+    assert.deepEqual(resolveRenderedReferenceIds(source, [{ target, text: "New display text" }]), ["ref-1"]);
+    // Source order and target, not the rendered alias, are the primary identity.
+    assert.deepEqual(resolveRenderedReferenceIds(source, [{ target, text: "Rendered differently" }]), ["ref-1"]);
+  }
+});
+
+test("Reading View pairing includes ordinary same-target links and rejects ambiguity", () => {
+  const target = "Target#^block-1";
+  const source = `[[${target}|Ordinary]] [[${target}|Smart]] %%ref:ref-1%%`;
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target, text: "Ordinary" },
+    { target, text: "Smart" },
+  ]), [null, "ref-1"]);
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target, text: "Ordinary" },
+    { target, text: "Smart" },
+    { target, text: "Another rendered link" },
+  ]), [null, "ref-1", null]);
+  assert.deepEqual(resolveRenderedReferenceIds(`[[${target}|Same]] %%ref:one%% [[${target}|Same]] %%ref:two%%`, [
+    { target, text: "Same" },
+    { target, text: "Same" },
+    { target, text: "Extra" },
+  ]), [null, null, null]);
+});
+
 test("reference lookup resolves known IDs and safely reports missing IDs", () => {
   const reference = makeReference({ refId: "known" });
   const references = { known: reference };
@@ -209,6 +239,21 @@ test("unchanged rendered target stays exact, including folded whitespace", () =>
     from: 7,
     to: 21,
   });
+});
+
+test("rendered exact match maps safely across multiple Markdown text nodes", () => {
+  const nodes = ["Prefix ", "chosen", " ", "words", " suffix"];
+  const range = findRenderedTextRange(nodes.join(""), "chosen words", "Prefix ", " suffix");
+  assert.deepEqual(range, { from: 7, to: 19 });
+  assert.deepEqual(mapTextRangeToSegments(nodes, range!), [
+    { nodeIndex: 1, from: 0, to: 6 },
+    { nodeIndex: 2, from: 0, to: 1 },
+    { nodeIndex: 3, from: 0, to: 5 },
+  ]);
+  assert.deepEqual(mapTextRangeToSegments(["before chosen", " words after"], { from: 7, to: 19 }), [
+    { nodeIndex: 0, from: 7, to: 13 },
+    { nodeIndex: 1, from: 0, to: 6 },
+  ]);
 });
 
 test("rendered exact failure reports block fallback instead of exact", () => {

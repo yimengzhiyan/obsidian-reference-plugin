@@ -6,6 +6,26 @@ interface NormalizedText {
   ends: number[];
 }
 
+export interface TextNodeSegment {
+  nodeIndex: number;
+  from: number;
+  to: number;
+}
+
+/** Map offsets in concatenated rendered text back to each original text node.
+ * This lets the DOM layer wrap only complete Text nodes, never a cross-element Range. */
+export function mapTextRangeToSegments(nodeTexts: readonly string[], range: TextRange): TextNodeSegment[] {
+  const segments: TextNodeSegment[] = [];
+  let cursor = 0;
+  for (const [nodeIndex, text] of nodeTexts.entries()) {
+    const from = Math.max(0, range.from - cursor);
+    const to = Math.min(text.length, range.to - cursor);
+    if (from < to) segments.push({ nodeIndex, from, to });
+    cursor += text.length;
+  }
+  return segments;
+}
+
 function normalizeWithOffsets(value: string): NormalizedText {
   let text = "";
   const starts: number[] = [];

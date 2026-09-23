@@ -3,7 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { locateReference, type LocateResult } from "./locator.ts";
 import type { PreciseReference } from "./model.ts";
 import { setPreciseHighlight } from "./highlight.ts";
-import { findRenderedTextRange } from "./rendered-text.ts";
+import { findRenderedTextRange, mapTextRangeToSegments } from "./rendered-text.ts";
 import { classifyHighlightResult, type NavigationResult } from "./navigation-result.ts";
 
 const HIGHLIGHT_DURATION_MS = 4_000;
@@ -108,7 +108,7 @@ async function highlightReadingView(
   const escapedId = CSS.escape(reference.blockId);
   const idElement = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
   if (!idElement) return null;
-  const block = idElement.closest<HTMLElement>("p, li") ?? idElement;
+  const block = readingBlockForId(idElement);
 
   if (location.kind === "block-only") {
     block.classList.add("smart-ref-reading-highlight");
@@ -129,9 +129,19 @@ async function highlightReadingView(
   }
   spans[0].scrollIntoView({ block: "center" });
   return { kind: "exact", cleanup: () => {
-    for (const span of spans) span.replaceWith(...Array.from(span.childNodes));
-    block.normalize();
+    unwrapTextSpans(block, spans);
   } };
+}
+
+function readingBlockForId(idElement: HTMLElement): HTMLElement {
+  const containingBlock = idElement.closest<HTMLElement>("p, li");
+  if (containingBlock) return containingBlock;
+  // Some renderers place the block-id anchor immediately after its paragraph.
+  // Limit the fallback to adjacent semantic blocks, never an entire section.
+  for (const sibling of [idElement.previousElementSibling, idElement.parentElement?.previousElementSibling]) {
+    if (sibling instanceof HTMLElement && sibling.matches("p, li")) return sibling;
+  }
+  return idElement;
 }
 
 function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffix: string): HTMLElement[] {
@@ -145,26 +155,32 @@ function wrapText(root: HTMLElement, selectedText: string, prefix: string, suffi
   }
   const found = findRenderedTextRange(combined, selectedText, prefix, suffix);
   if (!found) return [];
-  const { from: start, to: end } = found;
   const spans: HTMLElement[] = [];
-  let cursor = 0;
-
-  for (const node of nodes) {
-    const nodeStart = cursor;
-    const nodeEnd = cursor + node.data.length;
-    cursor = nodeEnd;
-    const from = Math.max(start, nodeStart);
-    const to = Math.min(end, nodeEnd);
-    if (from >= to) continue;
-    const range = document.createRange();
-    range.setStart(node, from - nodeStart);
-    range.setEnd(node, to - nodeStart);
-    const span = document.createElement("span");
-    span.className = "smart-ref-reading-highlight";
-    range.surroundContents(span);
-    spans.push(span);
+  const segments = mapTextRangeToSegments(nodes.map((node) => node.data), found);
+  try {
+    for (const segment of segments) {
+      const node = nodes[segment.nodeIndex];
+      // Split each Text node independently. A Range spanning Markdown-rendered
+      // elements cannot safely be passed to surroundContents().
+      if (segment.to < node.length) node.splitText(segment.to);
+      const selected = segment.from > 0 ? node.splitText(segment.from) : node;
+      const span = document.createElement("span");
+      span.className = "smart-ref-reading-highlight";
+      selected.parentNode?.insertBefore(span, selected);
+      span.appendChild(selected);
+      spans.push(span);
+    }
+  } catch (error) {
+    console.debug("[Smart Reference] rendered text wrapping failed", error);
+    unwrapTextSpans(root, spans);
+    return [];
   }
   return spans;
+}
+
+function unwrapTextSpans(root: HTMLElement, spans: HTMLElement[]): void {
+  for (const span of spans) span.replaceWith(...Array.from(span.childNodes));
+  root.normalize();
 }
 
 function getCodeMirrorView(editor: Editor): EditorView | null {

@@ -9,6 +9,11 @@ export interface SmartReferenceLink {
   refId: string;
 }
 
+export interface RenderedLinkIdentity {
+  target: string;
+  text: string;
+}
+
 interface WikiLink extends Omit<SmartReferenceLink, "refId"> {
   refId: string | null;
 }
@@ -75,19 +80,47 @@ export function findSmartReferenceAtOffset(
 
 export function annotateRenderedSmartReferences(root: HTMLElement, source: string): void {
   const anchors = Array.from(root.querySelectorAll<HTMLAnchorElement>("a.internal-link"));
-  const used = new Set<HTMLAnchorElement>();
-
-  for (const link of parseSmartReferenceLinks(source)) {
-    const anchor = anchors.find((candidate) => {
-      if (used.has(candidate)) return false;
-      const href = candidate.dataset.href ?? candidate.getAttribute("data-href") ?? "";
-      if (href !== link.target) return false;
-      return link.alias === null || candidate.textContent === unescapeAlias(link.alias);
-    });
-    if (!anchor) continue;
-    anchor.setAttribute(SMART_REF_ATTRIBUTE, link.refId);
-    used.add(anchor);
+  const identities = anchors.map((anchor) => ({
+    target: anchor.dataset.href ?? anchor.getAttribute("data-href") ?? "",
+    text: anchor.textContent ?? "",
+  }));
+  const refIds = resolveRenderedReferenceIds(source, identities);
+  for (const [index, refId] of refIds.entries()) {
+    if (refId) anchors[index].setAttribute(SMART_REF_ATTRIBUTE, refId);
+    else anchors[index].removeAttribute(SMART_REF_ATTRIBUTE);
   }
+}
+
+/** Reading View pairing uses current Markdown order, including ordinary Wiki
+ * Links. Alias text is only a unique fallback if rendered/source counts differ. */
+export function resolveRenderedReferenceIds(
+  source: string,
+  anchors: readonly RenderedLinkIdentity[],
+): Array<string | null> {
+  const results: Array<string | null> = anchors.map(() => null);
+  const links = parseWikiLinks(source);
+  const targets = new Set(anchors.map((anchor) => anchor.target));
+  for (const target of targets) {
+    const sourceLinks = links.filter((link) => link.target === target);
+    const renderedIndexes = anchors.flatMap((anchor, index) => anchor.target === target ? [index] : []);
+    if (sourceLinks.length === renderedIndexes.length) {
+      for (const [ordinal, index] of renderedIndexes.entries()) {
+        results[index] = sourceLinks[ordinal].refId;
+      }
+      continue;
+    }
+    // Rendered sections can contain links not represented by Wiki syntax.
+    // Associate only an unambiguous current alias; never borrow a ref ID by
+    // target alone when source/rendered counts disagree.
+    for (const link of sourceLinks) {
+      if (!link.refId || link.alias === null) continue;
+      const alias = unescapeAlias(link.alias);
+      if (sourceLinks.filter((candidate) => candidate.alias !== null && unescapeAlias(candidate.alias) === alias).length !== 1) continue;
+      const matches = renderedIndexes.filter((index) => anchors[index].text === alias);
+      if (matches.length === 1) results[matches[0]] = link.refId;
+    }
+  }
+  return results;
 }
 
 function findUnescapedAliasSeparator(linktext: string): number {
