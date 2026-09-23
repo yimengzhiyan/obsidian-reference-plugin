@@ -11,8 +11,9 @@ export interface SmartReferenceLink {
 
 export interface RenderedLinkIdentity {
   target: string;
-  text: string;
 }
+
+type ResolveLinkPath = (path: string) => string;
 
 interface WikiLink extends Omit<SmartReferenceLink, "refId"> {
   refId: string | null;
@@ -78,49 +79,78 @@ export function findSmartReferenceAtOffset(
   );
 }
 
-export function annotateRenderedSmartReferences(root: HTMLElement, source: string): void {
-  const anchors = Array.from(root.querySelectorAll<HTMLAnchorElement>("a.internal-link"));
+export function annotateRenderedSmartReferences(
+  root: HTMLElement,
+  source: string,
+  resolvePath: ResolveLinkPath = (path) => path,
+): void {
+  const anchors = Array.from(root.querySelectorAll<HTMLAnchorElement>("a[href], a.internal-link"));
   const identities = anchors.map((anchor) => ({
-    target: anchor.dataset.href ?? anchor.getAttribute("data-href") ?? "",
-    text: anchor.textContent ?? "",
+    target: anchor.dataset.href || anchor.getAttribute("href") || "",
   }));
-  const refIds = resolveRenderedReferenceIds(source, identities);
+  const refIds = resolveRenderedReferenceIds(source, identities, resolvePath);
   for (const [index, refId] of refIds.entries()) {
     if (refId) anchors[index].setAttribute(SMART_REF_ATTRIBUTE, refId);
     else anchors[index].removeAttribute(SMART_REF_ATTRIBUTE);
   }
 }
 
-/** Reading View pairing uses current Markdown order, including ordinary Wiki
- * Links. Alias text is only a unique fallback if rendered/source counts differ. */
+/** Pair block links by resolved target path, block ID, and same-target order.
+ * All Wiki Links count, so an ordinary link cannot borrow a Smart ref ID.
+ * Count mismatches stay unannotated because the rendered order is uncertain. */
 export function resolveRenderedReferenceIds(
   source: string,
   anchors: readonly RenderedLinkIdentity[],
+  resolvePath: ResolveLinkPath = (path) => path,
 ): Array<string | null> {
   const results: Array<string | null> = anchors.map(() => null);
-  const links = parseWikiLinks(source);
-  const targets = new Set(anchors.map((anchor) => anchor.target));
-  for (const target of targets) {
-    const sourceLinks = links.filter((link) => link.target === target);
-    const renderedIndexes = anchors.flatMap((anchor, index) => anchor.target === target ? [index] : []);
-    if (sourceLinks.length === renderedIndexes.length) {
-      for (const [ordinal, index] of renderedIndexes.entries()) {
-        results[index] = sourceLinks[ordinal].refId;
-      }
-      continue;
-    }
-    // Rendered sections can contain links not represented by Wiki syntax.
-    // Associate only an unambiguous current alias; never borrow a ref ID by
-    // target alone when source/rendered counts disagree.
-    for (const link of sourceLinks) {
-      if (!link.refId || link.alias === null) continue;
-      const alias = unescapeAlias(link.alias);
-      if (sourceLinks.filter((candidate) => candidate.alias !== null && unescapeAlias(candidate.alias) === alias).length !== 1) continue;
-      const matches = renderedIndexes.filter((index) => anchors[index].text === alias);
-      if (matches.length === 1) results[matches[0]] = link.refId;
-    }
+  const sourceGroups = new Map<string, Array<string | null>>();
+  for (const link of parseWikiLinks(source)) {
+    const key = blockTargetKey(link.target, resolvePath);
+    if (!key) continue;
+    const group = sourceGroups.get(key) ?? [];
+    group.push(link.refId);
+    sourceGroups.set(key, group);
+  }
+  const renderedGroups = new Map<string, number[]>();
+  anchors.forEach((anchor, index) => {
+    const key = blockTargetKey(anchor.target, resolvePath);
+    if (!key) return;
+    const group = renderedGroups.get(key) ?? [];
+    group.push(index);
+    renderedGroups.set(key, group);
+  });
+  for (const [key, indexes] of renderedGroups) {
+    const sourceIds = sourceGroups.get(key);
+    if (!sourceIds || sourceIds.length !== indexes.length) continue;
+    indexes.forEach((index, ordinal) => {
+      results[index] = sourceIds[ordinal];
+    });
   }
   return results;
+}
+
+function blockTargetKey(target: string, resolvePath: ResolveLinkPath): string | null {
+  const marker = target.indexOf("#");
+  if (marker < 0) return null;
+  const rawPath = target.slice(0, marker);
+  const rawFragment = target.slice(marker + 1);
+  if (!rawPath || !rawFragment) return null;
+  let path: string;
+  let fragment: string;
+  try {
+    path = decodeURIComponent(rawPath);
+  } catch {
+    path = rawPath;
+  }
+  try {
+    fragment = decodeURIComponent(rawFragment);
+  } catch {
+    fragment = rawFragment;
+  }
+  if (!fragment.startsWith("^") || fragment.length === 1) return null;
+  const blockId = fragment.slice(1);
+  return JSON.stringify([resolvePath(path), blockId]);
 }
 
 function findUnescapedAliasSeparator(linktext: string): number {
@@ -133,8 +163,4 @@ function findUnescapedAliasSeparator(linktext: string): number {
     if (backslashes % 2 === 0) return index;
   }
   return -1;
-}
-
-function unescapeAlias(alias: string): string {
-  return alias.replace(/\\\|/g, "|");
 }

@@ -574,9 +574,8 @@ native handler 执行精确跳转。以下情况不调用 `preventDefault`：
 因此 missing/stale 状态会继续执行 Obsidian 原生 Block Link。插件关闭时也没有
 handler/post processor，Markdown 仍是标准 Wiki Link。
 
-Reading View link/source association 当前通过 target、alias 和 occurrence order
-匹配。相同 target + alias 在同一 section 多次出现，以及包含混合 Markdown link
-的复杂 section，必须在 test Vault 中继续验证。
+Reading View link/source association 已由 D-036 更新为 path、block ID 和
+同目标顺序匹配。包含混合 Markdown link 的复杂 section 仍需 test Vault 验证。
 
 ---
 
@@ -707,7 +706,7 @@ ID 的 paragraph/list item，再用允许空白折叠的 rendered text 搜索。
 
 ## D-035 — Reading View 用顺序关联链接，并逐 Text node 包裹精确范围
 
-**Status:** Two real runtime failures observed; repair implemented, runtime revalidation pending
+**Status:** Rendered text wrapping pending runtime validation; association rule superseded by D-036
 
 用户验证 `click-runtime-fix` 后确认：Source 前后/无关编辑后的导航稳定，
 但 Reading View 对未改动的 target 总是高亮整个 block；修改 Wiki Link alias
@@ -727,3 +726,25 @@ Links。这既把显示文本变成关联的硬条件，也可能把普通同 ta
 `splitText` 只包裹各节点的匹配部分，恢复时移除 wrapper；也允许 block ID
 anchor 紧邻 paragraph/list item 的渲染布局。无法唯一定位时仍只高亮 block，
 不修改 Markdown。这个实现和结果报告都需要真实 Reading View 回归确认。
+
+---
+
+## D-036 — Reading View 链接按目标文件、block ID 和顺序注解
+
+**Status:** Implemented; real Obsidian revalidation pending
+
+真实 Obsidian 点击日志显示 `[Smart Reference] clicked link has no source editor view`。
+此日志出现在 link 没有 `data-smart-ref-id` 时：click handler 才回退尝试 Live
+Preview 的 source editor，而 Reading View 本来就没有该 editor。因此当前观察到的
+Reading View 整块效果可能是 Obsidian 原生 block 导航，并不能证明插件的精确
+高亮 renderer 已经失败。
+
+保留公开 `registerMarkdownPostProcessor` 和当前 section 的 Markdown source。
+为每个 rendered block link 取 `data-href`，缺失时取 `href`（也覆盖没有
+`internal-link` class 的 `<a href>`）；源链接和
+rendered link 都按解析后的目标文件路径、block ID 和同目标出现顺序关联。
+目标路径用当前 source note 的 `getFirstLinkpathDest` 解析。普通 Wiki Link 也
+参与顺序计数。数量不一致时不注解，移除旧的 alias 等值回退；alias 变化不应
+影响身份。click handler 先读 `anchor.dataset.smartRefId`，只有没有注解时才
+尝试 Live Preview 关联。缺少 section、marker、metadata 或 target 时保留
+Obsidian 原生点击行为。

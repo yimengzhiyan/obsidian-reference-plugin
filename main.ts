@@ -14,7 +14,6 @@ import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
   resolveLivePreviewReference,
-  SMART_REF_ATTRIBUTE,
 } from "./src/links.ts";
 import {
   getEditorSourceOffset,
@@ -48,8 +47,26 @@ export default class ReferencePlugin extends Plugin {
       capture: true,
     });
     this.registerMarkdownPostProcessor((element, context) => {
-      const section = context.getSectionInfo(element);
-      if (section) annotateRenderedSmartReferences(element, section.text);
+      const firstLink = element.querySelector<HTMLElement>("a[href], a.internal-link");
+      if (!firstLink) return;
+      const section = context.getSectionInfo(element) ?? context.getSectionInfo(firstLink);
+      if (!section) {
+        console.debug("[Smart Reference] Reading View annotation skipped: section unavailable", {
+          sourcePath: context.sourcePath,
+        });
+        return;
+      }
+      annotateRenderedSmartReferences(element, section.text, (path) =>
+        this.app.metadataCache.getFirstLinkpathDest(path, context.sourcePath)?.path ?? path
+      );
+      if (section.text.includes("%%ref:")) {
+        console.debug("[Smart Reference] Reading View link annotation", {
+          sourcePath: context.sourcePath,
+          lineStart: section.lineStart,
+          lineEnd: section.lineEnd,
+          annotated: element.querySelectorAll("a[data-smart-ref-id]").length,
+        });
+      }
     });
 
     this.addCommand({
@@ -285,11 +302,12 @@ export default class ReferencePlugin extends Plugin {
 
   private async handleSmartReferenceClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof Element)) return;
-    const anchor = event.target.closest<HTMLAnchorElement>("a.internal-link");
+    const anchor = event.target.closest<HTMLAnchorElement>("a");
     if (!anchor) return;
 
-    const refId = anchor.getAttribute(SMART_REF_ATTRIBUTE) ?? this.findLivePreviewRefId(anchor);
+    const refId = anchor.dataset.smartRefId ?? (anchor.matches("a.internal-link") ? this.findLivePreviewRefId(anchor) : null);
     if (!refId) {
+      if (!anchor.matches("a.internal-link")) return;
       console.debug("[Smart Reference] click not associated with a ref marker", {
         href: anchor.dataset.href ?? null,
         text: anchor.textContent,

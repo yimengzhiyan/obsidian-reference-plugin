@@ -137,29 +137,52 @@ test("Reading View pairing survives alias and unrelated Source edits", () => {
   const target = "Target#^block-1";
   const link = `[[${target}|New display text]] %%ref:ref-1%%`;
   for (const source of [link, `Intro ${link} tail`, `Other paragraph changed\n${link}`]) {
-    assert.deepEqual(resolveRenderedReferenceIds(source, [{ target, text: "New display text" }]), ["ref-1"]);
-    // Source order and target, not the rendered alias, are the primary identity.
-    assert.deepEqual(resolveRenderedReferenceIds(source, [{ target, text: "Rendered differently" }]), ["ref-1"]);
+    assert.deepEqual(resolveRenderedReferenceIds(source, [{ target }]), ["ref-1"]);
   }
 });
 
-test("Reading View pairing includes ordinary same-target links and rejects ambiguity", () => {
+test("Reading View pairs ordinary and Smart links by path, block ID, and order", () => {
   const target = "Target#^block-1";
-  const source = `[[${target}|Ordinary]] [[${target}|Smart]] %%ref:ref-1%%`;
+  const otherBlock = "Target#^block-2";
+  const source = `[[${target}|Ordinary]] [[${otherBlock}|Other]] %%ref:ref-2%% [[${target}|Smart]] %%ref:ref-1%%`;
   assert.deepEqual(resolveRenderedReferenceIds(source, [
-    { target, text: "Ordinary" },
-    { target, text: "Smart" },
-  ]), [null, "ref-1"]);
+    { target },
+    { target: otherBlock },
+    { target },
+  ]), [null, "ref-2", "ref-1"]);
+});
+
+test("Reading View resolves rendered href paths against the source note", () => {
+  const source = "[[Folder/Target#^sr-id|Edited alias]] %%ref:uuid%%";
+  const resolvePath = (path: string) => path === "Target" || path === "Folder/Target" ? "Folder/Target.md" : path;
   assert.deepEqual(resolveRenderedReferenceIds(source, [
-    { target, text: "Ordinary" },
-    { target, text: "Smart" },
-    { target, text: "Another rendered link" },
-  ]), [null, "ref-1", null]);
+    { target: "Target#^sr-id" },
+  ], resolvePath), ["uuid"]);
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target: "Folder%2FTarget#^sr-id" },
+  ], resolvePath), ["uuid"]);
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target: "Target#%5Esr-id" },
+  ], resolvePath), ["uuid"]);
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target: "Target#^other-id" },
+  ], resolvePath), [null]);
+});
+
+test("Reading View leaves count mismatches and non-block links unannotated", () => {
+  const target = "Target#^block-1";
+  const source = `[[${target}|Smart]] %%ref:ref-1%%`;
+  assert.deepEqual(resolveRenderedReferenceIds(source, [
+    { target },
+    { target },
+  ]), [null, null]);
   assert.deepEqual(resolveRenderedReferenceIds(`[[${target}|Same]] %%ref:one%% [[${target}|Same]] %%ref:two%%`, [
-    { target, text: "Same" },
-    { target, text: "Same" },
-    { target, text: "Extra" },
+    { target },
+    { target },
+    { target },
   ]), [null, null, null]);
+  assert.deepEqual(resolveRenderedReferenceIds(source, [{ target: "Target" }]), [null]);
+  assert.deepEqual(resolveRenderedReferenceIds(`[[${target}|Smart]] inserted %%ref:ref-1%%`, [{ target }]), [null]);
 });
 
 test("reference lookup resolves known IDs and safely reports missing IDs", () => {

@@ -58,9 +58,10 @@ Obsidian's native link handler.
 
 These remain technical-spike commands, not the final four-level user experience.
 The creation flow and navigation after Source and alias edits have been manually
-validated. Reading View still highlights the whole paragraph when exact text
-was expected. This branch adds temporary diagnostic logs; open the developer
-console and filter for `[Smart Reference] Reading View` when reproducing it.
+validated. A real Reading View click logged that its rendered link had no Smart
+Reference annotation, so the click fell through to native block navigation.
+This branch annotates links from each rendered section's Markdown source.
+Reading View enhancement and exact highlighting still need a test-Vault run.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:

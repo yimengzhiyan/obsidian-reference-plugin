@@ -389,9 +389,19 @@ of enhancement after unrelated Source edits. Native block navigation survived.
 ### Reading View exact-highlight diagnosis
 
 - [x] Add temporary logs for reference metadata, chosen rendered block, Text nodes, normalized matching, mapped segments, result, fallback reason, and exceptions
-- [ ] Capture the new logs from a real Reading View click in the disposable Vault
-- [ ] Confirm the specific root cause of whole-block fallback from those logs
+- [x] Capture real Reading View click log: link has no source editor view, meaning no usable `data-smart-ref-id` annotation
+- [ ] Confirm the rendered link receives `data-smart-ref-id` in the disposable Vault after this branch is installed
+- [ ] If enhanced navigation then reaches the target, use the rendered-highlight logs to diagnose any remaining exact-highlight fallback
 - [ ] Make a separate focused repair and remove temporary debug logging
+
+### Reading View link annotation
+
+- [x] Match rendered section Wiki Links to anchors by resolved target path, block ID, and same-target order
+- [x] Read rendered `href` when `data-href` is absent; remove alias equality fallback
+- [x] Read `anchor.dataset.smartRefId` before Live Preview source association
+- [x] Pure tests for edited alias, ordinary same-target link, different block ID, path resolution, and ambiguous counts
+- [ ] Real-Obsidian: Smart link has annotation and click uses enhanced navigation
+- [ ] Real-Obsidian: ordinary and unresolved links keep native navigation
 
 Deliberately inserting text between the Wiki Link and `%%ref:id%%` breaks
 adjacency by design; the native Wiki Block Link remains valid.
