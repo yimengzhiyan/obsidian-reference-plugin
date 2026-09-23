@@ -628,3 +628,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 核心原则：
 
 > 在“精确文本能够可靠创建、保存、重新定位并高亮”被证明之前，不投入大量时间做界面装饰和扩展功能。
+
+
+## Reading View source-block/range repair
+
+- [x] Runtime: Reading View annotation works; block-ID DOM lookup fails
+- [x] Remove block-ID DOM lookup and match current source-block rendering to a paragraph
+- [x] Normalize text and wrap per-node DOM Ranges for exact selections
+- [x] Preserve paragraph fallback and add container/range diagnostics
+- [x] Tests for mid-paragraph substring, source edits, whitespace, ambiguity, and fallback
+- [ ] Real Obsidian: exact highlight, alias/source edits, formatting, and timed cleanup

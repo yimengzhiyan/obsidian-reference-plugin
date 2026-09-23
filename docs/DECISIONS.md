@@ -748,3 +748,24 @@ rendered link 都按解析后的目标文件路径、block ID 和同目标出现
 影响身份。click handler 先读 `anchor.dataset.smartRefId`，只有没有注解时才
 尝试 Live Preview 关联。缺少 section、marker、metadata 或 target 时保留
 Obsidian 原生点击行为。
+
+
+---
+
+## D-037 — Reading View maps source-block text to rendered containers
+
+**Status:** Implemented; runtime validation pending
+
+Runtime confirms link annotation succeeds but block IDs are not exposed as DOM
+IDs/attributes in the tested Reading View. Use blockId only for source lookup.
+Render the current source block without its trailing ID through Obsidian's public
+MarkdownRenderer into a detached container, then match normalized full block text
+to a unique visible paragraph/list item. Do not identify the block by the selected
+substring. Duplicate full text is ambiguous and remains unsupported rather than
+choosing the wrong block. Embedded notes are excluded.
+
+Within the selected container, use normalized text/context matching and map the
+result back to Text nodes. Wrap a DOM Range contained within each matched Text
+node, preserving surrounding inline elements. Exact matching failure retains the
+container highlight; unavailable/ambiguous containers cannot receive a safe block
+fallback. Source metadata, link annotation, and selection remain unchanged.

@@ -58,10 +58,11 @@ Obsidian's native link handler.
 
 These remain technical-spike commands, not the final four-level user experience.
 The creation flow and navigation after Source and alias edits have been manually
-validated. A real Reading View click logged that its rendered link had no Smart
-Reference annotation, so the click fell through to native block navigation.
-This branch annotates links from each rendered section's Markdown source.
-Reading View enhancement and exact highlighting still need a test-Vault run.
+validated. Reading View link annotation is now runtime-validated. The next failure was
+a block-ID DOM lookup: those IDs are absent in the tested rendered view. This
+branch maps the current source block to a rendered paragraph by full text and
+wraps only the selected text using DOM Ranges. Exact highlighting still needs
+a test-Vault run.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:

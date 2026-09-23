@@ -1,37 +1,35 @@
 # CURRENT_STATUS
 
-## Current phase
+**Phase:** Reading View source-block to rendered-paragraph mapping
 
-**Phase:** Reading View link annotation repair
+**Branch:** `codex/reading-view-range-fix` (from `codex/reading-view-link-annotation`)
 
-**Branch:** `codex/reading-view-link-annotation` (from `codex/debug-render-highlight`)
+**Environment:** Linux/Codex; real Obsidian validation is performed in the user's disposable Vault.
 
-**Environment:** Linux/Codex; the user validates Obsidian behavior in a disposable Vault
+## Confirmed runtime finding
 
-Smart Reference creation, click navigation, navigation after Source edits, navigation after alias edits, and block highlighting are manually validated. Reading View still shows a whole-block result where exact text was expected.
+Reading View link association now works. Navigation logs reach `Reading View reference`, then report `block-id-element-missing`. The previous renderer incorrectly assumed that a Markdown block ID would appear as an HTML ID or data attribute.
 
-## Runtime finding
+## Implemented
 
-A real Reading View click logged `[Smart Reference] clicked link has no source editor view`. The click handler reaches its Live Preview source-editor lookup only when the clicked anchor has no `data-smart-ref-id`. Reading View has no such source editor, so the link was not enhanced and Obsidian's native block navigation took over. This finding identifies the missing link annotation as the first failure; it does not establish a failure in the exact-highlight renderer.
+- Recover the current Markdown block using its source block ID.
+- Strip the source block-ID marker and render that block into a detached container with Obsidian's public Markdown renderer. Compare its normalized full visible text with rendered paragraphs/list items in the opened note. This handles Markdown formatting without guessing how markup becomes text.
+- Retry briefly while Reading View finishes rendering. Exclude embedded notes, and prefer an inner paragraph when a list item contains the same text.
+- Search selectedText inside the matched paragraph with whitespace normalization and stored prefix/suffix context. Map offsets to Text nodes, create a DOM Range per matching Text node, and wrap only that range. Remove spans after the existing timer.
+- Preserve paragraph highlighting when the source locator or exact rendered match cannot recover the selection. Log container lookup, Text nodes, match offsets, Range creation, and result/failure reason.
 
-## Implemented on this branch
+Link annotation, selection workflow, and metadata format are unchanged. Alias and source-edit association tests remain passing.
 
-- The existing `registerMarkdownPostProcessor` now pairs each current rendered section's Wiki Links with anchors using the target file path, block ID, and same-target order. It asks Obsidian for section text using the rendered element, then its first link if needed. Paths are resolved relative to the source note through Obsidian's metadata cache.
-- Rendered links use `data-href` or, when absent, `href`, including anchors without an `internal-link` class. Encoded path and block fragments are decoded before matching.
-- All same-target Wiki Links, including ordinary links, participate in order. Count mismatches remain unannotated; alias text is never used as identity.
-- The click handler first reads `anchor.dataset.smartRefId`, then tries Live Preview source association. Missing association, metadata, or target still leaves native click handling in place.
-- Pure tests cover alias changes, ordinary links, block IDs, path resolution, encoded hrefs, and ambiguous rendered counts.
+## Validation
 
-The selection workflow, target locator, and highlight renderer have not changed. Temporary Reading View highlight diagnostics from the parent branch remain in place.
-
-## Verification
-
-- `npm test`: 24 tests passed.
+- `npm test`: 28 tests passed.
 - `npm run typecheck`: passed.
-- `npm run build`: passed; generated `main.js` is ignored.
+- `npm run build`: passed; generated main.js remains ignored.
 - `git diff --check`: passed.
-- This branch has not yet been run inside Obsidian.
+- Real Obsidian execution is still pending.
 
-## Next step
+## Limits and next step
 
-Install this branch in the disposable Vault and click a Smart Reference in Reading View. Confirm that the rendered anchor has `data-smart-ref-id` and that `[Smart Reference] clicked link has no source editor view` does not appear for that click. Then inspect the existing Reading View reference, target-block, text-node, match, and result logs to determine whether exact highlighting now succeeds. Check an ordinary link and an unresolved reference for native fallback. If exact highlighting still falls back, repair that separately using the captured logs.
+Identical full rendered block text is ambiguous; no arbitrary paragraph is chosen. If no unique container is available, navigation reports unavailable highlighting rather than highlighting the whole preview. Complex blocks or plugin-generated text can also prevent container matching.
+
+Install this branch and click a reference to words in the middle of a paragraph. Confirm `renderedContainerFound: true`, nonzero matched start offset, and `exactHighlightSuccess: true`. Repeat after alias changes and Source edits, with inline Markdown formatting, and with changed selected text to check paragraph fallback and timed cleanup.

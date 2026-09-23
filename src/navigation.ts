@@ -1,5 +1,7 @@
-import { Editor, MarkdownView, Notice, TFile, type App } from "obsidian";
+import { Component, Editor, MarkdownRenderer, MarkdownView, Notice, TFile, type App } from "obsidian";
 import { EditorView } from "@codemirror/view";
+import { findBlockById } from "./blocks.ts";
+import { findRenderedBlockIndex, sourceBlockMarkdown } from "./reading-container.ts";
 import { locateReference, type LocateResult } from "./locator.ts";
 import type { PreciseReference } from "./model.ts";
 import { setPreciseHighlight } from "./highlight.ts";
@@ -35,7 +37,7 @@ export class SmartReferenceNavigator {
 
     this.cancelHighlight();
     const applied = view.getMode() === "preview"
-      ? await highlightReadingView(view, reference, location)
+      ? await highlightReadingView(this.app, view, reference, location)
       : highlightEditingView(view, location);
     if (!applied) return "unsupported-view";
 
@@ -99,6 +101,7 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
 }
 
 async function highlightReadingView(
+  app: App,
   view: MarkdownView,
   reference: PreciseReference,
   location: Exclude<LocateResult, { kind: "missing-block" }>,
@@ -118,18 +121,20 @@ async function highlightReadingView(
       console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "preview-missing" });
       return null;
     }
-    const escapedId = CSS.escape(reference.blockId);
-    const idElement = preview.querySelector<HTMLElement>(`#${escapedId}, [data-block-id="${escapedId}"]`);
-    if (!idElement) {
-      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "block-id-element-missing" });
+    const sourceBlock = findBlockById(view.getViewData(), reference.blockId);
+    const block = sourceBlock ? await findReadingContainer(app, view, preview, sourceBlock.text) : null;
+    console.debug("[Smart Reference] Reading View container", {
+      refId: reference.refId,
+      renderedContainerFound: block !== null,
+      sourceBlockFrom: sourceBlock?.from ?? null,
+      sourceBlockTo: sourceBlock?.to ?? null,
+    });
+    if (!block) {
+      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "rendered-container-missing-or-ambiguous" });
       return null;
     }
-    const block = readingBlockForId(idElement);
     console.debug("[Smart Reference] Reading View target block", {
       refId: reference.refId,
-      idElementTag: idElement.tagName,
-      idElementClass: idElement.className,
-      idElementText: idElement.textContent,
       blockTag: block.tagName,
       blockClass: block.className,
       textContent: block.textContent,
@@ -161,19 +166,42 @@ async function highlightReadingView(
   }
 }
 
-function readingBlockForId(idElement: HTMLElement): HTMLElement {
-  const containingBlock = idElement.closest<HTMLElement>("p, li");
-  if (containingBlock) return containingBlock;
-  // Some renderers place the block-id anchor immediately after its paragraph.
-  // Limit the fallback to adjacent semantic blocks, never an entire section.
-  for (const sibling of [idElement.previousElementSibling, idElement.parentElement?.previousElementSibling]) {
-    if (sibling instanceof HTMLElement && sibling.matches("p, li")) return sibling;
+/** Render the current source block to compare complete visible block text, not
+ * the selected substring. No block ID or private Obsidian DOM mapping is used. */
+async function findReadingContainer(
+  app: App,
+  view: MarkdownView,
+  preview: HTMLElement,
+  sourceBlock: string,
+): Promise<HTMLElement | null> {
+  const detached = preview.ownerDocument.createElement("div");
+  const component = new Component();
+  component.load();
+  try {
+    await MarkdownRenderer.render(app, sourceBlockMarkdown(sourceBlock), detached, view.file?.path ?? "", component);
+    const expectedText = detached.textContent ?? "";
+    // Reading View may finish rendering after openFile resolves.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const all = Array.from(preview.querySelectorAll<HTMLElement>("p, li, h1, h2, h3, h4, h5, h6, pre"))
+        .filter((element) => !element.closest(".internal-embed"));
+      // A loose list may wrap its text in a paragraph. Prefer that paragraph
+      // instead of treating its containing li as a second identical block.
+      const candidates = all.filter((element) => !all.some((child) =>
+        child !== element && element.contains(child) &&
+        findRenderedBlockIndex(element.textContent ?? "", [child.textContent ?? ""]) === 0
+      ));
+      const index = findRenderedBlockIndex(expectedText, candidates.map((element) => element.textContent ?? ""));
+      if (index !== null) return candidates[index];
+      await nextAnimationFrame();
+    }
+    return null;
+  } finally {
+    component.unload();
   }
-  return idElement;
 }
 
 function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapResult {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   let combined = "";
   while (walker.nextNode()) {
@@ -207,8 +235,7 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
     matchedStart: found?.from ?? null,
     matchedEnd: found?.to ?? null,
     positionUnit: "UTF-16 offset in concatenated DOM text nodes",
-    domRangeCreated: false,
-    wrappingMethod: "splitText",
+    wrappingMethod: "per-text-node DOM Range",
   });
   if (!found) {
     const fallbackReason = nodes.length === 0 ? "no-text-nodes"
@@ -224,14 +251,13 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
   try {
     for (const segment of segments) {
       const node = nodes[segment.nodeIndex];
-      // Split each Text node independently. A Range spanning Markdown-rendered
-      // elements cannot safely be passed to surroundContents().
-      if (segment.to < node.length) node.splitText(segment.to);
-      const selected = segment.from > 0 ? node.splitText(segment.from) : node;
-      const span = document.createElement("span");
+      // Each Range stays within one Text node, preserving surrounding markup.
+      const range = root.ownerDocument.createRange();
+      range.setStart(node, segment.from);
+      range.setEnd(node, segment.to);
+      const span = root.ownerDocument.createElement("span");
       span.className = "smart-ref-reading-highlight";
-      selected.parentNode?.insertBefore(span, selected);
-      span.appendChild(selected);
+      range.surroundContents(span);
       spans.push(span);
     }
   } catch (error) {
@@ -239,6 +265,7 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
     unwrapTextSpans(root, spans);
     return { spans: [], fallbackReason: "text-node-wrapping-exception" };
   }
+  console.debug("[Smart Reference] Reading View ranges", { refId: reference.refId, domRangeCreated: spans.length > 0, count: spans.length });
   return { spans, fallbackReason: null };
 }
 

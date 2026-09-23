@@ -1,3 +1,4 @@
+import { findRenderedBlockIndex, sourceBlockMarkdown } from "../src/reading-container.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ensureBlockId, findBlockById, findContainingBlock } from "../src/blocks.ts";
@@ -299,3 +300,36 @@ function makeReference(overrides: Partial<PreciseReference>): PreciseReference {
     ...overrides,
   };
 }
+
+
+test("Reading View container uses the full source block, not a selected substring", () => {
+  const source = "Earlier chosen words elsewhere\n\nPrefix chosen words suffix ^block-1";
+  const block = findBlockById(source, "block-1")!;
+  const rendered = sourceBlockMarkdown(block.text);
+  assert.equal(findRenderedBlockIndex(rendered, ["Earlier chosen words elsewhere", "Prefix chosen words suffix"]), 1);
+  const range = findRenderedTextRange(rendered, "chosen words", "Prefix ", " suffix");
+  assert.deepEqual(range, { from: 7, to: 19 });
+  assert.deepEqual(mapTextRangeToSegments(["Prefix chosen words suffix"], range!), [{ nodeIndex: 0, from: 7, to: 19 }]);
+});
+
+test("Reading View block recovery uses current source after edits", () => {
+  const source = "Inserted paragraph\n\nNew prefix. Prefix chosen words suffix ^block-1";
+  const block = findBlockById(source, "block-1")!;
+  const rendered = sourceBlockMarkdown(block.text);
+  assert.equal(findRenderedBlockIndex(rendered, ["Inserted paragraph", rendered]), 1);
+  assert.deepEqual(findRenderedTextRange(rendered, "chosen words", "Prefix ", " suffix"), { from: 19, to: 31 });
+});
+
+test("Reading View container tolerates whitespace but rejects duplicate or missing blocks", () => {
+  assert.equal(findRenderedBlockIndex("Prefix\nchosen words suffix", ["Prefix chosen\u00a0 words suffix"]), 0);
+  assert.equal(findRenderedBlockIndex("same", ["same", "same"]), null);
+  assert.equal(findRenderedBlockIndex("missing", ["other"]), null);
+  assert.equal(findRenderedBlockIndex("", [""]), null);
+});
+
+test("Reading View keeps a paragraph fallback when selected text no longer matches", () => {
+  const rendered = sourceBlockMarkdown("Prefix replacement suffix ^block-1");
+  assert.equal(findRenderedBlockIndex(rendered, [rendered]), 0);
+  assert.equal(findRenderedTextRange(rendered, "chosen words", "Prefix ", " suffix"), null);
+  assert.equal(sourceBlockMarkdown("Text **formatted** here ^sr-id"), "Text **formatted** here");
+});
