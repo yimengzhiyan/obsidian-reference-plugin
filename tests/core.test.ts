@@ -475,3 +475,42 @@ test("editor block fallback uses the locator range and decorations follow edits"
   state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { ranges.push({ from, to }); });
   assert.deepEqual(ranges, [{ from: 4, to: source.length + 4 }]);
 });
+
+
+test("Chinese editor selection recovers after surrounding edits and invalid old offsets", () => {
+  const selectedText = "尝试从相反";
+  const original = "对异常现象保持敏感，并尝试从相反的方向理解它。 ^block-1";
+  const startOffset = original.indexOf(selectedText);
+  const reference = makeReference({ selectedText, startOffset, endOffset: startOffset + selectedText.length, prefix: "并", suffix: "的方向理解它。" });
+  const cases = [
+    { content: original, reference },
+    { content: `新增前言。\n\n${original}`, reference },
+    { content: "改变前文，同时尝试从相反的方向重新理解问题。 ^block-1", reference },
+    { content: original, reference: { ...reference, startOffset: 9999, endOffset: 10004 } },
+  ];
+  for (const { content, reference: ref } of cases) {
+    const location = locateReference(content, ref);
+    assert.equal(location.kind, "exact");
+    let state = EditorState.create({ doc: content, extensions: [preciseHighlightField] });
+    const range = toEditorHighlightRange(location.range, content.length, (offset) => {
+      const line = state.doc.lineAt(offset);
+      return { line: line.number - 1, ch: offset - line.from };
+    }, state.doc)!;
+    state = state.update({ effects: setPreciseHighlight.of(range) }).state;
+    const highlighted: string[] = [];
+    state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { highlighted.push(state.doc.sliceString(from, to)); });
+    assert.deepEqual(highlighted, [selectedText]);
+  }
+});
+
+test("Chinese editor recovery uses context for repeats and keeps block fallback on failure", () => {
+  const selectedText = "尝试从相反";
+  const reference = makeReference({ selectedText, startOffset: 999, endOffset: 1004, prefix: "并", suffix: "的方向" });
+  const content = "先尝试从相反的角度，并尝试从相反的方向理解。 ^block-1";
+  const location = locateReference(content, reference);
+  assert.equal(location.kind, "exact");
+  assert.equal(location.range.from, content.lastIndexOf(selectedText));
+  assert.equal(content.slice(location.range.from, location.range.to), selectedText);
+  assert.equal(locateReference(content, { ...reference, prefix: "已删除", suffix: "已删除" }).kind, "block-only");
+  assert.equal(locateReference("原文已经替换。 ^block-1", reference).kind, "block-only");
+});

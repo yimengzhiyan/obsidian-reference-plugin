@@ -668,3 +668,11 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Verify decoration application and log mode/path/range/result
 - [x] CM6 tests for exact recovery, cleanup, fallback, and mapped edits
 - [ ] Real Obsidian: Live Preview and Source targets, alias/source edits, cleanup
+
+
+## Live Preview paragraph-highlight diagnosis
+
+- [x] Add full Editor locator and decoration-input diagnostics
+- [x] Chinese exact-recovery tests: changed context, invalid offsets, repeats, fallback
+- [ ] Capture failing runtime logs and distinguish locator from decoration range failure
+- [ ] Apply a minimal evidence-based fix, then validate in Obsidian

@@ -35,7 +35,24 @@ export class SmartReferenceNavigator {
 
     const mode = view.getMode();
     console.debug("[Smart Reference] target view", { mode, targetPath: file.path });
-    const location = locateReference(mode === "source" ? view.editor.getValue() : view.getViewData(), reference);
+    const currentText = mode === "source" ? view.editor.getValue() : view.getViewData();
+    const location = locateReference(currentText, reference);
+    if (mode === "source") {
+      console.debug("[Smart Reference] Editor locator", {
+        mode,
+        targetPath: file.path,
+        refId: reference.refId,
+        kind: location.kind,
+        range: location.kind === "missing-block" ? null : location.range,
+        selectedText: reference.selectedText,
+        startOffset: reference.startOffset,
+        endOffset: reference.endOffset,
+        currentTextLength: currentText.length,
+        locatedText: location.kind === "missing-block" ? null : currentText.slice(location.range.from, location.range.to),
+        prefix: reference.prefix,
+        suffix: reference.suffix,
+      });
+    }
     console.debug("[Smart Reference] target locator", { refId: reference.refId, kind: location.kind });
     if (location.kind === "missing-block") return "missing-block";
 
@@ -114,6 +131,13 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
       effects.push(StateEffect.appendConfig.of(preciseHighlightField));
     }
     effects.push(setPreciseHighlight.of(range), EditorView.scrollIntoView(range.from, { y: "center" }));
+    console.debug("[Smart Reference] Editor decoration input", {
+      targetPath,
+      locatorRange: location.range,
+      codeMirrorRange: range,
+      decoratedText: cm.state.doc.sliceString(range.from, range.to),
+      codeMirrorTextLength: cm.state.doc.length,
+    });
     cm.dispatch({ effects });
     const decorations = cm.state.field(preciseHighlightField, false);
     let applied = false;

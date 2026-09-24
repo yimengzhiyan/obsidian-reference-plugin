@@ -2,7 +2,7 @@
 
 **Branch:** `codex/editor-exact-highlight-fix`
 **Base:** `codex/reading-click-resolution-fix` at 7ae048e
-**Environment:** Linux/Codex; editor-mode Obsidian validation pending.
+**Environment:** Linux/Codex; Live Preview whole-paragraph highlight observed; diagnosis pending.
 
 ## Verified milestone
 
@@ -30,7 +30,7 @@ highlighting when enhanced/manual navigation opens an editor target.
 
 ## Validation
 
-- npm test: 41 passed
+- npm test: 43 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -45,3 +45,24 @@ of a paragraph; confirm only selected text highlights and Editor highlight repor
 success=true with the expected range. Repeat after alias/source edits and target
 text shifts, then verify block fallback and cleanup. Retest the verified Reading
 View path as a regression check.
+
+
+## Latest editor diagnosis checkpoint
+
+User confirms Live Preview click/navigation/highlight runs but the whole paragraph
+is emphasized. Add `[Smart Reference] Editor locator` before highlighting with mode,
+targetPath, kind, range, selectedText, stored offsets and currentTextLength. Also
+log locatedText and context. `[Smart Reference] Editor decoration input` records
+locatorRange, codeMirrorRange and decoratedText immediately before dispatch.
+
+Tests with 尝试从相反 pass for invalid stored offsets, changed surrounding text,
+inserted paragraphs, context disambiguation and block fallback. The existing code
+already reads current editor content and applies locator recovery. No reproducible
+algorithm defect was identified here, so this checkpoint adds diagnostics/tests
+without changing locator, conversion, fallback, Reading View or click resolution.
+
+Next: capture Editor locator, Editor decoration input and Editor highlight for one
+failing Live Preview click. block-only points to recovery failure; exact with an
+incorrect CodeMirror range points to conversion. If both logged text slices are
+only the selection and the decoration succeeds, investigate the rendered editor
+emphasis separately. Keep diagnostics until actual runtime validation succeeds.
