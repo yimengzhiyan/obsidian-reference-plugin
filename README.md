@@ -39,7 +39,9 @@ four-level reference UI is not implemented.
 [[Target#^block-id|display text]]<!--smart-ref:uuid-->
 ```
 
-The adjacent HTML comment is invisible in Reading View. Alias edits do not change
+The adjacent HTML comment is invisible in Reading View. Live Preview hides both
+HTML markers and legacy `%%ref:id%%` markers using editor decorations; Source mode
+keeps raw Markdown visible. Alias edits do not change
 reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
 markers remain readable; markers separated into another paragraph require explicit
 relocation with their original refId. Notes are not automatically migrated.
@@ -76,6 +78,13 @@ Both views share metadata/target validation and `navigator.navigate(reference)`.
 Native clicks are canceled only after those checks pass.
 
 ### Editor decorations
+
+A separate replacement-decoration StateField hides complete Smart Reference marker
+tokens only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
+on document or mode changes and provides atomic cursor ranges. It never changes
+Markdown or source offsets. Ordinary comments and pending-creation placeholders
+remain untouched. Switch to Source mode to inspect/edit raw markers.
+
 
 For Live Preview/Source editor targets, the locator validates stored offsets,
 searches selectedText within its block, then uses prefix/suffix to disambiguate.

@@ -1,6 +1,6 @@
 # CURRENT_STATUS
 
-**Phase:** Smart Reference feature prepared for integration; not merged
+**Phase:** Live Preview metadata concealment; not merged
 **Branch:** `codex/live-preview-click-interception`
 **Environment:** Linux/Codex; real Obsidian workflow validation supplied by user
 
@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 47 passed
+- npm test: 50 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -45,3 +45,18 @@ See README for exact behavior and the integration regression checklist.
 
 Review this branch for integration and optionally smoke-test the quiet build in the
 same Vault. Merge only when explicitly authorized; no merge was performed.
+
+
+## Live Preview cleanup
+
+Added a separate CM6 replacement-decoration field driven by Obsidian's public
+editorLivePreviewField. Complete %%ref:id%% and <!--smart-ref:id--> tokens are hidden
+in Live Preview, including detached legacy markers. Source mode shows raw Markdown.
+The document is unchanged; existing parser/click offsets and exact marks remain valid.
+Atomic cursor ranges skip concealed markers. Recompute on source/mode changes only.
+Ordinary comments, incomplete markers and pending placeholders are not concealed.
+
+Tests cover both formats, unchanged source/ref resolution, mode toggles, edits,
+incomplete markers and coexistence with exact-highlight decorations. Existing click
+and highlight implementations are untouched. A real Obsidian check remains for
+marker visibility, mode switching, alias clicks and both highlight strategies.

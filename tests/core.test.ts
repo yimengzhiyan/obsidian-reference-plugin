@@ -1,5 +1,6 @@
+import { createMetadataHidingField } from "../src/metadata-hiding.ts";
 import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
-import { EditorState, StateEffect, Text } from "@codemirror/state";
+import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
 import { toEditorHighlightRange } from "../src/editor-range.ts";
 import { findRenderedBlockIndex, sourceBlockMarkdown } from "../src/reading-container.ts";
@@ -547,4 +548,54 @@ test("integration builds disable diagnostics without evaluating note-text payloa
   let evaluated = false;
   debugLog(() => { evaluated = true; return ["private note text"]; });
   assert.equal(evaluated, false);
+});
+
+
+const setTestLivePreview = StateEffect.define<boolean>();
+const testLivePreviewField = StateField.define<boolean>({
+  create: () => true,
+  update: (value, transaction) => {
+    for (const effect of transaction.effects) if (effect.is(setTestLivePreview)) value = effect.value;
+    return value;
+  },
+});
+
+test("Live Preview hides both metadata formats without changing source or reference resolution", () => {
+  const source = "[[Target#^block|alias]]<!--smart-ref:uuid--> %%ref:legacy%% <!--ordinary--> %%comment%% %%smart-ref:pending%%";
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  const state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding] });
+  const hidden: string[] = [];
+  state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
+  assert.deepEqual(hidden, ["<!--smart-ref:uuid-->", "%%ref:legacy%%"]);
+  assert.equal(state.doc.toString(), source);
+  assert.equal(resolveLivePreviewSpanLink(state.doc.toString(), 0, source.indexOf("alias"), 0, 1)?.refId, "uuid");
+});
+
+test("metadata hiding follows Live Preview/Source switches and current edits", () => {
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  let state = EditorState.create({ doc: "%%ref:old%%", extensions: [testLivePreviewField, hiding] });
+  assert.equal(state.field(hiding).size, 1);
+  state = state.update({ effects: setTestLivePreview.of(false) }).state;
+  assert.equal(state.field(hiding).size, 0);
+  assert.equal(state.doc.toString(), "%%ref:old%%");
+  state = state.update({ changes: { from: 0, to: state.doc.length, insert: "Before <!--smart-ref:new-->" } }).state;
+  assert.equal(state.field(hiding).size, 0);
+  state = state.update({ effects: setTestLivePreview.of(true) }).state;
+  const offsets: number[] = [];
+  state.field(hiding).between(0, state.doc.length, (from) => { offsets.push(from); });
+  assert.deepEqual(offsets, [7]);
+  state = state.update({ changes: { from: 0, to: state.doc.length, insert: "<!--smart-ref:incomplete" } }).state;
+  assert.equal(state.field(hiding).size, 0);
+});
+
+test("metadata replacement coexists with exact editor marks and defaults to visible without mode field", () => {
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  const source = "chosen words <!--smart-ref:uuid-->";
+  let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding, preciseHighlightField] });
+  state = state.update({ effects: setPreciseHighlight.of({ from: 0, to: 12 }) }).state;
+  assert.equal(state.field(hiding).size, 1);
+  const marked: string[] = [];
+  state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { marked.push(state.doc.sliceString(from, to)); });
+  assert.deepEqual(marked, ["chosen words"]);
+  assert.equal(EditorState.create({ doc: source, extensions: [hiding] }).field(hiding).size, 0);
 });

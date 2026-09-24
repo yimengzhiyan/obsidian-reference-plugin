@@ -701,3 +701,11 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Pure tests and tests/typecheck/build/diff checks
 - [x] Real Obsidian: alias click opens target and executes exact Editor highlight
 - [x] Real Obsidian: Reading View exact highlight regression check
+
+
+## Live Preview metadata cleanup
+
+- [x] Hide complete legacy/HTML metadata using CM6 replacement decorations
+- [x] Preserve raw Markdown in Source mode and source offsets in both modes
+- [x] Tests for mode switches, edits, refId resolution and exact-mark coexistence
+- [ ] Real Obsidian: metadata hidden, Source visible, alias clicks/highlights unchanged

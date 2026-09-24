@@ -1,6 +1,7 @@
 import { debugLog } from "./src/debug.ts";
 import {
   Editor,
+  editorLivePreviewField,
   FuzzyMatch,
   FuzzySuggestModal,
   MarkdownFileInfo,
@@ -11,6 +12,7 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import { ensureBlockId } from "./src/blocks.ts";
+import { createMetadataHidingField } from "./src/metadata-hiding.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
@@ -45,6 +47,7 @@ export default class ReferencePlugin extends Plugin {
     this.navigator = new SmartReferenceNavigator(this.app);
     await this.store.load();
     this.registerEditorExtension(preciseHighlightField);
+    this.registerEditorExtension(createMetadataHidingField(editorLivePreviewField));
     this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event), {
       capture: true,
     });

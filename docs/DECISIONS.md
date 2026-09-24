@@ -831,3 +831,14 @@ Troubleshooting requires enabling the source flag, rebuilding and reloading; res
 it before integration/release. No settings UI or metadata schema change is needed.
 Known ambiguity, parser, embedded-note, editor bridge and rename/move limitations
 remain explicit. Merge requires separate user authorization.
+
+
+## D-043 — Conceal metadata with Live Preview replacement decorations
+
+Use the public editorLivePreviewField to gate a dedicated CM6 StateField of
+Decoration.replace ranges. Hide complete legacy percent markers and smart-ref HTML
+comments without changing Markdown, source offsets, reference data or navigation.
+Source mode (or an unavailable mode field) returns no concealment decorations.
+Atomic ranges keep cursor movement out of hidden metadata; switch to Source for
+raw marker edits. Rebuild on document/mode changes, not selection-only transactions.
+Exact highlighting remains an independent decoration field. Runtime revalidation pending.
