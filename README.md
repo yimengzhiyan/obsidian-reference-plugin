@@ -97,6 +97,23 @@ maps it through edits, and removes it after the timer. Unrecoverable exact text
 falls back to the block range. Raw Source link-click interception is not added;
 editor highlighting works when the existing navigation/command opens that target.
 
+### Backlinks display
+
+A UI-only observer conceals complete `%%ref:id%%` and `<!--smart-ref:id-->`
+text tokens inside Backlinks/embedded linked-mention snippets. Hidden wrappers
+preserve textContent, link elements and native handlers; no Markdown or metadata
+is rewritten. Split search-match spans are supported. Rerenders are reprocessed,
+and plugin unload removes the wrappers. Source mode remains raw.
+
+This adapter depends on private Obsidian DOM selectors: `.backlink-pane`,
+`.embedded-backlinks`, `[data-type="backlink"]`, and
+`.search-result-file-matched-text`. DOM changes may leave markers visible. Global
+search, incomplete/truncated markers, and separate pop-out documents are not
+covered. Real Vault validation is pending for this adapter.
+
+Future appearance, hover/focus and settings ideas are in
+[the UI proposal](docs/UI_PROPOSAL.md); these are not implemented settings.
+
 ## Diagnostics
 
 Normal builds are quiet. For troubleshooting, set `SMART_REFERENCE_DEBUG` to `true`

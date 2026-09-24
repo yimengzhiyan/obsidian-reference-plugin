@@ -1,4 +1,5 @@
 import { debugLog } from "./src/debug.ts";
+import { startBacklinksCleanup } from "./src/backlinks-cleanup.ts";
 import {
   Editor,
   editorLivePreviewField,
@@ -48,6 +49,7 @@ export default class ReferencePlugin extends Plugin {
     await this.store.load();
     this.registerEditorExtension(preciseHighlightField);
     this.registerEditorExtension(createMetadataHidingField(editorLivePreviewField));
+    this.register(startBacklinksCleanup(document.body));
     this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event), {
       capture: true,
     });

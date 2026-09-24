@@ -1,3 +1,5 @@
+import { JSDOM } from "jsdom";
+import { concealBacklinkSnippet, startBacklinksCleanup } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField } from "../src/metadata-hiding.ts";
 import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
@@ -652,4 +654,90 @@ test("generated anchors use token-compatible marks and rebuild after anchor edit
   assert.equal(state.doc.line(1).text, "Text ^my-fa1b9d4b");
   state = state.update({ effects: setTestLivePreview.of(false) }).state;
   assert.equal(state.field(hiding).size, 0);
+});
+
+// DOM fixtures exercise Backlinks presentation without loading Obsidian.
+
+function parseHTML(html: string) {
+  const { window } = new JSDOM(html);
+  return { window, document: window.document };
+}
+
+function backlinksFixture() {
+  return parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-matched-text"><a href="Target#^block">Alias</a> %%ref:legacy%% &lt;!--smart-<span class="search-result-file-match">ref:uuid</span>--&gt; tail</div></div></body></html>');
+}
+
+function visibleSnippetText(element: Element): string {
+  const copy = element.cloneNode(true) as Element;
+  copy.querySelectorAll('.smart-ref-hidden-backlink-metadata').forEach((node) => node.remove());
+  return copy.textContent ?? '';
+}
+
+test("Backlinks hides split metadata and preserves text, links and event handlers", () => {
+  const { document, window } = backlinksFixture();
+  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  const source = snippet.textContent;
+  const anchor = snippet.querySelector('a')!;
+  let clicks = 0;
+  anchor.addEventListener('click', () => clicks++);
+  assert.equal(concealBacklinkSnippet(snippet), 4);
+  assert.equal(visibleSnippetText(snippet), 'Alias   tail');
+  assert.equal(snippet.textContent, source);
+  assert.equal(snippet.querySelector('a'), anchor);
+  for (const span of snippet.querySelectorAll('.smart-ref-hidden-backlink-metadata')) {
+    assert.equal(window.getComputedStyle(span).display, 'none');
+  }
+  anchor.dispatchEvent(new window.Event('click'));
+  assert.equal(clicks, 1);
+  assert.equal(anchor.getAttribute('href'), 'Target#^block');
+  assert.equal(concealBacklinkSnippet(snippet), 0);
+});
+
+test("Backlinks cleanup excludes editors, Reading View and global search", () => {
+  const { document } = parseHTML('<html><body></body></html>');
+  for (const containerClass of ['cm-editor', 'markdown-preview-view', 'search-view']) {
+    const container = document.createElement('div');
+    container.className = containerClass;
+    container.innerHTML = '<div class="search-result-file-matched-text">%%ref:keep%%</div>';
+    document.body.append(container);
+    const snippet = container.firstElementChild!;
+    assert.equal(concealBacklinkSnippet(snippet), 0);
+    assert.equal(snippet.innerHTML, '%%ref:keep%%');
+  }
+});
+
+test("Backlinks preserves ordinary comments, partial markers and real DOM comments", () => {
+  const { document } = backlinksFixture();
+  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  snippet.innerHTML = '%%comment%% %%smart-ref:pending%% &lt;!--ordinary--&gt; %%ref:partial <!--smart-ref:uuid-->';
+  const before = snippet.innerHTML;
+  assert.equal(concealBacklinkSnippet(snippet), 0);
+  assert.equal(snippet.innerHTML, before);
+});
+
+test("Backlinks observer cleans new and reused results and restores wrappers on unload", async () => {
+  const { document } = backlinksFixture();
+  const stop = startBacklinksCleanup(document.body);
+  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  assert.equal(visibleSnippetText(snippet), 'Alias   tail');
+  const embedded = document.createElement('div');
+  embedded.className = 'embedded-backlinks';
+  embedded.innerHTML = '<div class="search-result-file-matched-text">New %%ref:new%% end</div>';
+  document.body.append(embedded);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(visibleSnippetText(embedded), 'New  end');
+  snippet.textContent = 'Changed <!--smart-ref:changed--> end';
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(visibleSnippetText(snippet), 'Changed  end');
+  // Reusing a formerly hidden text node must not conceal ordinary text.
+  snippet.querySelector('.smart-ref-hidden-backlink-metadata')!.firstChild!.textContent = 'ordinary';
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(visibleSnippetText(snippet), 'Changed ordinary end');
+  stop();
+  assert.equal(document.querySelectorAll('.smart-ref-hidden-backlink-metadata').length, 0);
+  assert.equal(snippet.textContent, 'Changed ordinary end');
+  assert.equal(embedded.textContent, 'New %%ref:new%% end');
+  snippet.textContent = '%%ref:after-unload%%';
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(snippet.innerHTML, '%%ref:after-unload%%');
 });

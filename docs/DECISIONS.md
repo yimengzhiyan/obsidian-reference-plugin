@@ -863,3 +863,17 @@ nested/co-located cm-blockid tokens. Do not mutate CodeMirror DOM or hide every
 cm-blockid token. Mode gating and atomic ranges remain; Source has no concealment
 marks. Marker comments still use replacement decorations. Debug logs report
 matched IDs/count; actual visibility must be validated in Obsidian.
+
+
+## D-046 — Conceal Backlinks metadata only in the rendered UI
+
+Use a scoped DOM observer because editor decorations do not control Backlinks.
+Within private Backlinks containers, match complete reserved markers over each
+snippet's concatenated text nodes, wrapping individual portions with hidden spans.
+Keep textContent, original elements/handlers and actual comment nodes intact.
+Never replace innerHTML or change the Markdown/store to clean up display.
+Disconnect the observer around writes, reconcile reused results, and unwrap on
+unload. Missing selectors or incomplete tokens stay visible instead of guessing.
+This depends on Obsidian's private Backlinks DOM and requires real-Vault validation.
+Initial scope is the main document; pop-out documents and global search are deferred.
+UI appearance/hover/settings work is a proposal only, with no stored-schema changes.

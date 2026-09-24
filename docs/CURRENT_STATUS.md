@@ -1,6 +1,6 @@
 # CURRENT_STATUS
 
-**Phase:** Live Preview metadata concealment; not merged
+**Phase:** Backlinks display cleanup and UI proposal; not merged
 **Branch:** `codex/live-preview-click-interception`
 **Environment:** Linux/Codex; real Obsidian workflow validation supplied by user
 
@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 53 passed
+- npm test: 57 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -97,3 +97,30 @@ No real Obsidian UI is available here. Next: reload the built main.js, verify th
 new mark around cm-blockid, Live Preview invisibility, Source visibility, ordinary
 anchors, and reference clicks/exact highlights. Current branch remains
 codex/live-preview-click-interception; no merge to main.
+
+
+## Backlinks display cleanup
+
+User confirms the core workflow and Live Preview marker/block-ID hiding work.
+Remaining reported leak is Backlinks/linked mentions. A dedicated DOM observer now
+wraps complete legacy and HTML metadata text in hidden spans only within Backlinks
+snippets. Text content, link identity/handlers and real DOM comments survive.
+No Markdown, store, navigation, click or highlighting implementation changed.
+Source/editor content is excluded. Existing and newly rendered/edited snippets are
+processed; cleanup disconnects during its own writes and restores spans on unload.
+
+Private DOM selectors are isolated in src/backlinks-cleanup.ts. Their compatibility
+is not established by unit tests. Truncated markers and separate pop-out documents
+remain unsupported. Logs report hidden span counts only behind the debug flag.
+Added jsdom as a development-only dependency for actual DOM/observer fixture tests.
+
+Validation: 57 tests pass, typecheck/build pass, diff check passes. Tests cover split
+markers, computed display, event/element preservation, scope exclusions, ordinary
+comments, result replacement, reuse of hidden text nodes and unload restoration.
+Runtime acceptance remains: install/reload, inspect sidebar and embedded backlinks,
+expand/collapse/filter/update results, confirm raw Source and both click/highlight
+paths, then disable plugin and confirm restoration. No new Obsidian UI run here.
+
+UI_PROPOSAL.md contains unimplemented reference appearance, hover/focus information,
+and settings ideas. Next step is real Backlinks validation and proposal review;
+no merge is authorized or performed.

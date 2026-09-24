@@ -727,3 +727,17 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Add token-mark/edit regression test; 53 tests, typecheck and build pass
 - [ ] Real Obsidian: generated anchors hidden in Live Preview, visible in Source
 - [ ] Real Obsidian: ordinary anchors visible, clicks and exact highlights unchanged
+
+
+## Backlinks cleanup and UI proposal
+
+- [x] User verified core workflow and Live Preview marker/block-ID concealment
+- [x] Hide complete legacy/HTML metadata in Backlinks and embedded snippets only
+- [x] Preserve source text, actual comments, links/handlers and raw Source mode
+- [x] Handle split tokens, dynamic results and unload; add DOM fixture tests
+- [x] 57 tests, typecheck, build and diff check pass
+- [x] Document private DOM dependency and appearance/hover/settings proposal
+- [ ] Real Vault: sidebar/embedded backlinks, expand/collapse/filter/rerender
+- [ ] Real Vault: Source raw text, reference navigation and exact highlights unchanged
+- [ ] Real Vault: disable/re-enable restores/reapplies display cleanup
+- [ ] Review UI_PROPOSAL.md before implementing optional UI changes
