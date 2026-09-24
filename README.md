@@ -58,11 +58,10 @@ Obsidian's native link handler.
 
 These remain technical-spike commands, not the final four-level user experience.
 The creation flow and navigation after Source and alias edits have been manually
-validated. Reading View link annotation is now runtime-validated. The next failure was
-a block-ID DOM lookup: those IDs are absent in the tested rendered view. This
-branch maps the current source block to a rendered paragraph by full text and
-wraps only the selected text using DOM Ranges. Exact highlighting still needs
-a test-Vault run.
+validated. Runtime logs now show that clicks can arrive before Reading View
+annotation finishes. Clicks therefore resolve refId directly from current source
+when DOM metadata is absent. Filter the console for `[Smart Reference] click
+resolution` to confirm which path ran before inspecting target highlight results.
 Use a disposable test Vault. Current manual checks are:
 
 1. Run the exact selection-confirmation regression:

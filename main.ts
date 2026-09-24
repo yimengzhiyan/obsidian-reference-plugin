@@ -13,6 +13,8 @@ import { ensureBlockId } from "./src/blocks.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
+  adjacentCommentRefId,
+  resolveReadingClickReference,
   buildSmartReferenceLink,
   resolveLivePreviewReference,
 } from "./src/links.ts";
@@ -307,22 +309,37 @@ export default class ReferencePlugin extends Plugin {
     const anchor = event.target.closest<HTMLAnchorElement>("a");
     if (!anchor) return;
 
-    const refId = anchor.dataset.smartRefId ?? (anchor.matches("a.internal-link") ? this.findLivePreviewRefId(anchor) : null);
+    let refId = anchor.dataset.smartRefId || null;
+    let resolutionPath = refId ? "dom-attribute" : "unresolved-native-fallback";
     if (!refId) {
-      if (!anchor.matches("a.internal-link")) return;
-      console.debug("[Smart Reference] click not associated with a ref marker", {
-        href: anchor.dataset.href ?? null,
-        text: anchor.textContent,
-      });
-      return;
+      refId = adjacentCommentRefId(anchor);
+      if (refId) resolutionPath = "adjacent-dom-comment";
     }
+    if (!refId) {
+      const view = this.findContainingMarkdownView(anchor);
+      if (view?.getMode() === "preview") {
+        refId = this.findReadingViewRefId(view, anchor);
+        if (refId) resolutionPath = "reading-source-resolution";
+      } else if (view?.getMode() === "source" && anchor.matches("a.internal-link")) {
+        refId = this.findLivePreviewRefId(view, anchor);
+        if (refId) resolutionPath = "live-preview-source-resolution";
+      }
+    }
+    console.debug("[Smart Reference] click resolution", {
+      path: resolutionPath,
+      refId,
+      href: anchor.dataset.href || anchor.getAttribute("href"),
+    });
+    if (!refId) return;
     const reference = this.store.getReference(refId);
     if (!reference) {
-      console.debug("[Smart Reference] reference metadata missing; native link handles click", { refId });
+      console.debug("[Smart Reference] click resolution", { path: "unresolved-native-fallback", reason: "metadata-missing", refId });
       return;
     }
     if (!this.navigator.hasTarget(reference)) {
-      console.debug("[Smart Reference] target missing; native link handles click", {
+      console.debug("[Smart Reference] click resolution", {
+        path: "unresolved-native-fallback",
+        reason: "target-missing",
         refId,
         targetPath: reference.targetFile,
       });
@@ -334,19 +351,31 @@ export default class ReferencePlugin extends Plugin {
     showNavigationResult(await this.navigator.navigate(reference));
   }
 
-  private findLivePreviewRefId(anchor: HTMLAnchorElement): string | null {
+  private findContainingMarkdownView(anchor: HTMLAnchorElement): MarkdownView | null {
     const matchingViews: MarkdownView[] = [];
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(anchor)) {
         matchingViews.push(leaf.view);
       }
     });
-    const view = matchingViews[0];
-    if (!view || view.getMode() !== "source") {
-      console.debug("[Smart Reference] clicked link has no source editor view");
-      return null;
-    }
+    return matchingViews.length === 1 ? matchingViews[0] : null;
+  }
 
+  private findReadingViewRefId(view: MarkdownView, anchor: HTMLAnchorElement): string | null {
+    const preview = anchor.closest<HTMLElement>(".markdown-preview-view");
+    // Embedded notes have different source Markdown from their containing view.
+    if (!preview || !view.containerEl.contains(preview) || anchor.closest(".internal-embed")) return null;
+    const anchors = Array.from(preview.querySelectorAll<HTMLAnchorElement>("a[href], a.internal-link"))
+      .filter((candidate) => !candidate.closest(".internal-embed"));
+    return resolveReadingClickReference(
+      view.getViewData(),
+      anchors.map((candidate) => ({ target: candidate.dataset.href || candidate.getAttribute("href") || "" })),
+      anchors.indexOf(anchor),
+      (path) => this.app.metadataCache.getFirstLinkpathDest(path, view.file?.path ?? "")?.path ?? path,
+    );
+  }
+
+  private findLivePreviewRefId(view: MarkdownView, anchor: HTMLAnchorElement): string | null {
     const target = anchor.dataset.href ?? anchor.getAttribute("data-href");
     if (!target) {
       console.debug("[Smart Reference] clicked link has no data-href");

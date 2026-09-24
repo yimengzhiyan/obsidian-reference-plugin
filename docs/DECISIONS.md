@@ -780,3 +780,15 @@ DOM comment if retained, with section-source association as fallback when render
 filters comments. Alias is never identity. This supersedes the generated percent
 marker syntax from D-029. Detached legacy paragraphs require explicit relocation;
 no automatic migration guesses which link owns them. Real Obsidian validation pending.
+
+
+## D-039 — Resolve Reading View references synchronously on click
+
+Definitive runtime logs show a click without refId followed later by successful
+annotation. Postprocessor timing cannot determine whether enhancement works.
+Resolve from DOM attribute, adjacent comment, then current containing-view source.
+Reuse annotation's source parser and resolved path/block identity/order matcher.
+Count mismatches remain native; unique source/rendered target pairs are safe.
+Do not wait for annotation or cancel native clicks until refId, metadata and target
+are validated. Log the actual association path. This change does not modify target
+highlighting, and the observed native block effect is not evidence of its failure.

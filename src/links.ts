@@ -33,7 +33,7 @@ export function parseSmartReferenceComment(comment: string): string | null {
   return /^smart-ref:([A-Za-z0-9_-]+)$/.exec(comment)?.[1] ?? null;
 }
 
-function adjacentCommentRefId(anchor: HTMLAnchorElement): string | null {
+export function adjacentCommentRefId(anchor: HTMLAnchorElement): string | null {
   let sibling = anchor.nextSibling;
   while (sibling?.nodeType === 3 && !sibling.textContent?.trim()) sibling = sibling.nextSibling;
   return sibling?.nodeType === 8 ? parseSmartReferenceComment(sibling.textContent ?? "") : null;
@@ -146,6 +146,18 @@ export function resolveRenderedReferenceIds(
     });
   }
   return results;
+}
+
+/** Resolve a click without any annotation state. A unique target is the
+ * one-source/one-rendered case; count mismatches never guess an ordinal. */
+export function resolveReadingClickReference(
+  source: string,
+  anchors: readonly RenderedLinkIdentity[],
+  clickedIndex: number,
+  resolvePath: ResolveLinkPath = (path) => path,
+): string | null {
+  if (!Number.isInteger(clickedIndex) || clickedIndex < 0 || clickedIndex >= anchors.length) return null;
+  return resolveRenderedReferenceIds(source, anchors, resolvePath)[clickedIndex] ?? null;
 }
 
 function blockTargetKey(target: string, resolvePath: ResolveLinkPath): string | null {

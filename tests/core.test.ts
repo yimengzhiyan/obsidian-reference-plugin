@@ -10,6 +10,7 @@ import {
   findSmartReferenceAtOffset,
   parseSmartReferenceLinks,
   resolveLivePreviewReference,
+  resolveReadingClickReference,
   resolveRenderedReferenceIds,
 } from "../src/links.ts";
 import type { PreciseReference } from "../src/model.ts";
@@ -384,4 +385,46 @@ test("annotation uses DOM comments without section source and source when commen
   assert.equal(attrs.get("data-smart-ref-id"), "uuid");
   annotateRenderedSmartReferences(root, "[[Target#^block|ordinary]]");
   assert.equal(attrs.has("data-smart-ref-id"), false);
+});
+
+
+test("Reading click resolves one Smart Reference without prior DOM annotation", () => {
+  const anchors = [{ target: "Target#^block" }]; // No dataset/refId/comment input.
+  assert.equal(resolveReadingClickReference("[[Target#^block|alias]]<!--smart-ref:id-->", anchors, 0), "id");
+});
+
+test("Reading click retains refId after alias changes", () => {
+  for (const alias of ["first", "new alias", "对异常现象"]) {
+    assert.equal(resolveReadingClickReference(`[[Target#^block|${alias}]]<!--smart-ref:id-->`, [{ target: "Target#^block" }], 0), "id");
+  }
+});
+
+test("Reading click reads current source after unrelated edits", () => {
+  const link = "[[Target#^block|alias]]<!--smart-ref:id-->";
+  for (const source of [link, `Inserted before ${link} after`, `Unrelated paragraph\n\n${link}\n\nChanged tail`]) {
+    assert.equal(resolveReadingClickReference(source, [{ target: "Target#^block" }], 0), "id");
+  }
+});
+
+test("Reading click counts ordinary links when resolving same-target ordinals", () => {
+  const source = "[[Target#^block|ordinary]] [[Other#^block|other]] [[Target#^block|smart]]<!--smart-ref:id-->";
+  const anchors = [{ target: "Target#^block" }, { target: "Other#^block" }, { target: "Target#^block" }];
+  assert.equal(resolveReadingClickReference(source, anchors, 0), null);
+  assert.equal(resolveReadingClickReference(source, anchors, 2), "id");
+});
+
+test("Reading click refuses mismatched counts and invalid clicked indexes", () => {
+  const link = "[[Target#^block|smart]]<!--smart-ref:id-->";
+  const anchor = { target: "Target#^block" };
+  assert.equal(resolveReadingClickReference(link, [anchor, anchor], 0), null);
+  assert.equal(resolveReadingClickReference(`[[Target#^block|ordinary]] ${link}`, [anchor], 0), null);
+  assert.equal(resolveReadingClickReference(link, [anchor], -1), null);
+  assert.equal(resolveReadingClickReference(link, [anchor], 1), null);
+});
+
+test("Reading click reuses annotation's resolved path and block identity", () => {
+  const source = "[[Folder/Target#^block|alias]]<!--smart-ref:id-->";
+  const resolver = (path: string) => path === "Target" ? "Folder/Target" : path;
+  assert.equal(resolveReadingClickReference(source, [{ target: "Target#%5Eblock" }], 0, resolver), "id");
+  assert.equal(resolveReadingClickReference(source, [{ target: "Target#^different" }], 0, resolver), null);
 });

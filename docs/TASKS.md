@@ -647,3 +647,14 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Reading View DOM comment annotation plus section-source fallback
 - [x] Tests for alias/source edits and stripped comments
 - [ ] Real Obsidian: new creation, invisible marker, annotation, alias/source edits
+
+
+## Reading View click-time resolution
+
+- [x] Runtime: click precedes successful annotation; native fallback confirmed
+- [x] Resolve current source at click time without requiring annotation
+- [x] Reuse path/block/order identity; preserve ambiguity fallback
+- [x] Log all five resolution paths
+- [x] Six pure association tests and full tests/typecheck/build/diff checks
+- [ ] Real Obsidian: unannotated click, alias/source edits, ordinary/ambiguous links
+- [ ] Confirm enhanced navigation before evaluating target exact-highlight logs

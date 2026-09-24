@@ -1,41 +1,51 @@
 # CURRENT_STATUS
 
-**Branch:** `codex/reference-marker-redesign`
+**Branch:** `codex/reading-click-resolution-fix`
 
-**Environment:** Linux/Codex; real Obsidian validation pending.
+**Base:** `codex/reference-marker-redesign` at a4b89d5
 
-The requested branch did not exist locally or remotely, so it was created from
-`codex/reading-view-range-fix` at 7a462d9.
+**Environment:** Linux/Codex; real Obsidian revalidation pending.
 
-## Current change
+## Definitive runtime finding
 
-New references generate `[[Target#^block|alias]]<!--smart-ref:uuid-->` without a
-newline or blank paragraph between the link and marker. HTML comments are invisible
-in Reading View. The reference store and refId values are unchanged.
+A click logged `click not associated with a ref marker`, followed later by a
+postprocessor log with `annotated: 1` for Source.md. The click was not enhanced.
+The apparent block highlight was likely native navigation; that click did not
+exercise the plugin target highlighting algorithm. Prior renderer failures remain
+separate observations and cannot explain this click.
 
-The parser accepts adjacent HTML markers and legacy same-line `%%ref:id%%` markers.
-Reading View annotation first uses an adjacent DOM comment when retained; otherwise
-it uses current section source, target and link order. Alias text is not identity.
-DOM comment annotation also works when section source is unavailable. Live Preview
-uses the same source parser. Raw Source mode displays editable Markdown as before.
+## Implemented
 
-Highlight algorithms and selection behavior were not changed in this branch.
+Click resolution is synchronous before native event cancellation. Path order:
+
+1. `dom-attribute`: anchor.dataset.smartRefId
+2. `adjacent-dom-comment`: immediate HTML comment
+3. Containing MarkdownView: Reading View uses current view.getViewData(), rendered
+   anchor identities/order in its preview, and the same parser/resolved target key
+   as annotation (`reading-source-resolution`). Live Preview retains current-line
+   source association (`live-preview-source-resolution`).
+4. `unresolved-native-fallback`: no safe association, metadata, or target.
+
+No timeout or prior postprocessor execution is required. Annotation remains a fast
+path. The unique-source/unique-rendered target case resolves directly; mismatched
+counts remain native. All ordinary same-target Wiki Links count toward ordinals.
+Embedded note source is not borrowed from the host note. Partial rendering of
+repeated targets may therefore safely leave a click native.
+
+Reference store, marker format, highlight algorithm, selection and UI are unchanged.
 
 ## Validation
 
-- npm test: 32 passed
+- npm test: 38 passed (six new click-time association tests)
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
 
-Tests cover generation/parse round-trip, alias and surrounding edits, ordinary links,
-legacy format, DOM comment annotation and source fallback when comments are removed.
+## Next real Obsidian validation
 
-## Next step / limits
-
-Create a new reference in a test Vault; confirm the comment is invisible in Reading
-View and the anchor receives data-smart-ref-id. Repeat after alias/source edits.
-If both DOM comment and section source are unavailable, native navigation remains.
-Existing markers separated from links by blank paragraphs are not automatically
-migrated: move the known marker beside its corresponding link and change it to the
-new HTML comment syntax, keeping the same refId. No heuristic cross-paragraph pairing.
+Click an unannotated Reading View anchor, including one with no retained DOM comment.
+Confirm `[Smart Reference] click resolution` reports `reading-source-resolution`
+and the expected refId before target navigation. Repeat after alias/unrelated source
+edits. Test ordinary + Smart links to the same target and count mismatches, then
+Live Preview and the annotated fast path. Only after proving enhanced navigation
+ran should the existing target-highlight logs be used to assess exact highlighting.
