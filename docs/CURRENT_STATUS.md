@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 50 passed
+- npm test: 52 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -60,3 +60,18 @@ Tests cover both formats, unchanged source/ref resolution, mode toggles, edits,
 incomplete markers and coexistence with exact-highlight decorations. Existing click
 and highlight implementations are untouched. A real Obsidian check remains for
 marker visibility, mode switching, alias clicks and both highlight strategies.
+
+
+## Generated target anchors
+
+User verified legacy ref markers are hidden in Live Preview and raw source remains
+visible. Extend the same replacement decorations to whitespace-delimited,
+line-ending ^sr- plus eight lowercase hexadecimal characters (the generator's
+format). Only anchor characters are hidden; whitespace, Markdown and offsets are
+unchanged. Ordinary/custom IDs and Wiki Link target fragments are not matched.
+No navigation, click, highlight or reference-store code changed.
+
+Tests verify mode toggling, exact-match exclusions, unchanged source, ref resolution,
+block lookup and exact-decoration coexistence. Real Obsidian confirmation remains:
+Live Preview hides target anchors; Source shows them; clicks still navigate and
+highlight the selected text.

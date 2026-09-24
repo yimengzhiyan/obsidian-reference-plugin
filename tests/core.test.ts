@@ -599,3 +599,35 @@ test("metadata replacement coexists with exact editor marks and defaults to visi
   assert.deepEqual(marked, ["chosen words"]);
   assert.equal(EditorState.create({ doc: source, extensions: [hiding] }).field(hiding).size, 0);
 });
+
+test("Live Preview conceals only generated block anchors and Source retains them", () => {
+  const source = "Paragraph ^sr-9134bc06\r\n^sr-f3f81c62\nKeep ^custom-id\nKeep ^sr-short\nKeep ^sr-9134bc060\nMiddle ^sr-9134bc06 text\n[[Target#^sr-9134bc06|alias]]";
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding] });
+  const original = state.doc.toString();
+  const hidden: string[] = [];
+  state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
+  assert.deepEqual(hidden, ["^sr-9134bc06", "^sr-f3f81c62"]);
+  state = state.update({ effects: setTestLivePreview.of(false) }).state;
+  assert.equal(state.field(hiding).size, 0);
+  assert.equal(state.doc.toString(), original);
+  state = state.update({ effects: setTestLivePreview.of(true) }).state;
+  assert.equal(state.field(hiding).size, 2);
+});
+
+test("concealed anchors remain available for reference navigation and exact decoration", () => {
+  const source = "Prefix chosen words suffix ^sr-9134bc06";
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding, preciseHighlightField] });
+  const reference = makeReference({ blockId: "sr-9134bc06" });
+  const link = buildSmartReferenceLink("Target.md", reference.blockId, "alias", reference.refId);
+  assert.equal(resolveLivePreviewSpanLink(link, 0, link.indexOf("alias"), 0, 1)?.refId, reference.refId);
+  const location = locateReference(state.doc.toString(), reference);
+  assert.equal(location.kind, "exact");
+  state = state.update({ effects: setPreciseHighlight.of(location.range) }).state;
+  const highlighted: string[] = [];
+  state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { highlighted.push(state.doc.sliceString(from, to)); });
+  assert.deepEqual(highlighted, ["chosen words"]);
+  assert.equal(state.field(hiding).size, 1);
+  assert.equal(state.doc.toString(), source);
+});

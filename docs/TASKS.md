@@ -709,3 +709,11 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Preserve raw Markdown in Source mode and source offsets in both modes
 - [x] Tests for mode switches, edits, refId resolution and exact-mark coexistence
 - [ ] Real Obsidian: metadata hidden, Source visible, alias clicks/highlights unchanged
+
+
+## Generated block anchor concealment
+
+- [x] Runtime: legacy ref markers hidden; Source retains raw Markdown
+- [x] Hide generated line-ending ^sr-xxxxxxxx anchors with existing replacement field
+- [x] Test Source/Live Preview switching, ordinary-ID exclusions and exact highlighting
+- [ ] Real Obsidian: target anchors hidden, source visible, navigation/highlighting intact

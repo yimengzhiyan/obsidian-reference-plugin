@@ -7,7 +7,9 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
   const build = (state: EditorState): DecorationSet => {
     if (state.field(livePreview, false) !== true) return Decoration.none;
     const ranges = Array.from(state.doc.toString().matchAll(
-      /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->/g,
+      // Generated anchors are lowercase UUID prefixes at the end of a line.
+      // Keep arbitrary user block IDs and link fragments visible.
+      /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->|(?<!\S)\^sr-[0-9a-f]{8}(?=[ \t]*\r?$)/gm,
     ), (match) => Decoration.replace({ inclusive: false }).range(match.index!, match.index! + match[0].length));
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", { count: ranges.length }]);
     return Decoration.set(ranges);

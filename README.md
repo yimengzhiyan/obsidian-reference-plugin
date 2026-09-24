@@ -40,7 +40,8 @@ four-level reference UI is not implemented.
 ```
 
 The adjacent HTML comment is invisible in Reading View. Live Preview hides both
-HTML markers and legacy `%%ref:id%%` markers using editor decorations; Source mode
+HTML markers, legacy `%%ref:id%%` markers, and generated `^sr-xxxxxxxx` block
+anchors using editor decorations; Source mode
 keeps raw Markdown visible. Alias edits do not change
 reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
 markers remain readable; markers separated into another paragraph require explicit
@@ -80,7 +81,8 @@ Native clicks are canceled only after those checks pass.
 ### Editor decorations
 
 A separate replacement-decoration StateField hides complete Smart Reference marker
-tokens only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
+tokens and generated line-ending block anchors only when Obsidian's public
+`editorLivePreviewField` is true. It rebuilds
 on document or mode changes and provides atomic cursor ranges. It never changes
 Markdown or source offsets. Ordinary comments and pending-creation placeholders
 remain untouched. Switch to Source mode to inspect/edit raw markers.

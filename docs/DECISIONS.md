@@ -842,3 +842,13 @@ Source mode (or an unavailable mode field) returns no concealment decorations.
 Atomic ranges keep cursor movement out of hidden metadata; switch to Source for
 raw marker edits. Rebuild on document/mode changes, not selection-only transactions.
 Exact highlighting remains an independent decoration field. Runtime revalidation pending.
+
+
+## D-044 — Conceal generated target anchors in Live Preview
+
+Extend D-043's existing replacement field to line-ending whitespace-delimited
+^sr-xxxxxxxx tokens, where x is lowercase hexadecimal, matching createBlockId.
+Preserve all Markdown and source offsets. Source mode reveals raw anchors. Do not
+hide arbitrary user block IDs or target fragments inside Wiki Links. Generated
+ownership is inferred from the reserved pattern; a manually created identical
+pattern is also concealed. Navigation/highlight/storage algorithms are unchanged.
