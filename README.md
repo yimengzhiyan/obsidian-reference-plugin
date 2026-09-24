@@ -80,9 +80,10 @@ Native clicks are canceled only after those checks pass.
 
 ### Editor decorations
 
-A separate replacement-decoration StateField hides complete Smart Reference marker
-tokens and generated line-ending block anchors only when Obsidian's public
-`editorLivePreviewField` is true. It rebuilds
+A separate StateField hides complete Smart Reference markers with replacement
+decorations and generated line-ending block anchors with styled mark decorations.
+The marks conceal Obsidian `cm-blockid` tokens without hiding ordinary block IDs.
+Both apply only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
 on document or mode changes and provides atomic cursor ranges. It never changes
 Markdown or source offsets. Ordinary comments and pending-creation placeholders
 remain untouched. Switch to Source mode to inspect/edit raw markers.

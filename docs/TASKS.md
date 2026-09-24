@@ -717,3 +717,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Hide generated line-ending ^sr-xxxxxxxx anchors with existing replacement field
 - [x] Test Source/Live Preview switching, ordinary-ID exclusions and exact highlighting
 - [ ] Real Obsidian: target anchors hidden, source visible, navigation/highlighting intact
+
+
+## Block-ID token concealment repair
+
+- [x] Record runtime failure of a92e110: cm-blockid anchors still visible
+- [x] Replace anchor-only concealment with scoped CM6 mark/theme treatment
+- [x] Keep normal anchors, Source mode, metadata comments and exact marks intact
+- [x] Add token-mark/edit regression test; 53 tests, typecheck and build pass
+- [ ] Real Obsidian: generated anchors hidden in Live Preview, visible in Source
+- [ ] Real Obsidian: ordinary anchors visible, clicks and exact highlights unchanged

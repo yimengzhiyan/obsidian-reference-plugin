@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 52 passed
+- npm test: 53 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -75,3 +75,25 @@ Tests verify mode toggling, exact-match exclusions, unchanged source, ref resolu
 block lookup and exact-decoration coexistence. Real Obsidian confirmation remains:
 Live Preview hides target anchors; Source shows them; clicks still navigate and
 highlight the selected text.
+
+
+## Block-ID syntax token cleanup (supersedes replacement-only attempt)
+
+Runtime validation rejected a92e110: generated anchors remained visible as
+`<span class="cm-blockid">^sr-fa1b9d4b</span>`. State-only replacement tests did
+not establish actual Obsidian rendering behavior. The DOM observation confirms
+visible syntax tokens; the precise reason replacement lost at runtime is unproven.
+
+Generated anchors now receive a dedicated CM6 mark class with a scoped base theme
+that hides the mark and nested/co-located cm-blockid tokens. Only matching anchor
+source ranges receive the class; bare cm-blockid tokens are never globally hidden.
+Source mode removes all concealment marks. Legacy/HTML marker replacements remain.
+Debug-only diagnostics list matched block IDs and hidden decoration count (not a
+claim of measured DOM visibility). No navigation/click/highlight/storage changes.
+
+Validation: 53 tests, typecheck, build and diff check pass. Added mark-class and
+anchor-edit coverage; existing mode, exclusions, locator and exact-mark tests pass.
+No real Obsidian UI is available here. Next: reload the built main.js, verify the
+new mark around cm-blockid, Live Preview invisibility, Source visibility, ordinary
+anchors, and reference clicks/exact highlights. Current branch remains
+codex/live-preview-click-interception; no merge to main.

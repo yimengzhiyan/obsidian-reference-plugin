@@ -631,3 +631,25 @@ test("concealed anchors remain available for reference navigation and exact deco
   assert.equal(state.field(hiding).size, 1);
   assert.equal(state.doc.toString(), source);
 });
+
+test("generated anchors use token-compatible marks and rebuild after anchor edits", () => {
+  const hiding = createMetadataHidingField(testLivePreviewField);
+  let state = EditorState.create({
+    doc: "Text ^sr-fa1b9d4b\n%%ref:legacy%%",
+    extensions: [testLivePreviewField, hiding],
+  });
+  const specs: Array<{ text: string; className: string | undefined }> = [];
+  state.field(hiding).between(0, state.doc.length, (from, to, decoration) => {
+    specs.push({ text: state.doc.sliceString(from, to), className: decoration.spec.class });
+  });
+  assert.deepEqual(specs, [
+    { text: "^sr-fa1b9d4b", className: "smart-ref-hidden-block-id" },
+    { text: "%%ref:legacy%%", className: undefined },
+  ]);
+  // Editing the reserved prefix reveals a normal user anchor immediately.
+  state = state.update({ changes: { from: 6, to: 8, insert: "my" } }).state;
+  assert.equal(state.field(hiding).size, 1);
+  assert.equal(state.doc.line(1).text, "Text ^my-fa1b9d4b");
+  state = state.update({ effects: setTestLivePreview.of(false) }).state;
+  assert.equal(state.field(hiding).size, 0);
+});

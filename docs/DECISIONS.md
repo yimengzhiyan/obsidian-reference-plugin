@@ -852,3 +852,14 @@ Preserve all Markdown and source offsets. Source mode reveals raw anchors. Do no
 hide arbitrary user block IDs or target fragments inside Wiki Links. Generated
 ownership is inferred from the reserved pattern; a manually created identical
 pattern is also concealed. Navigation/highlight/storage algorithms are unchanged.
+
+
+## D-045 — Style generated anchor syntax tokens through CM6 marks
+
+Supersedes D-044's replacement mechanism for anchors after runtime failure.
+Keep the reserved, line-ending ^sr- plus eight lowercase hex pattern. Apply a
+smart-ref-hidden-block-id mark and editor base theme that hides it, including
+nested/co-located cm-blockid tokens. Do not mutate CodeMirror DOM or hide every
+cm-blockid token. Mode gating and atomic ranges remain; Source has no concealment
+marks. Marker comments still use replacement decorations. Debug logs report
+matched IDs/count; actual visibility must be validated in Obsidian.
