@@ -1,110 +1,117 @@
 # Obsidian Reference Plugin
 
-An Obsidian plugin for creating internal references with custom display text,
-precise target positioning, and navigation highlighting.
+Create native Wiki Block Links that return to the exact selected source text.
+The full Smart Reference workflow has been verified in real Obsidian: Reading
+View click resolution and exact DOM Range highlighting, plus Live Preview span
+click interception, refId resolution, navigation and CodeMirror exact highlighting.
+This feature is prepared for integration; it has not been merged into main.
 
-See `docs/PROJECT_CONTEXT.md` for the complete project definition.
-
-## Development
-
-Install dependencies and build the plugin bundle:
+## Development and installation
 
 ```bash
 npm install
+npm test
+npm run typecheck
 npm run build
 ```
 
-For the local watch/rebuild development workflow, run:
+`npm run dev` watches and rebuilds but does not reload Obsidian. Generated `main.js`
+is ignored by Git. Copy `main.js`, `manifest.json`, and `styles.css` into
+`<test-vault>/.obsidian/plugins/obsidian-reference-plugin/`, then enable/reload the
+community plugin. Use a disposable Vault for development.
 
-```bash
-npm run dev
+## Workflow
+
+1. Run **Create Smart Reference (precise text spike)** from the source note.
+2. Choose the target note, select text in its editor, and press Enter.
+3. The plugin creates/reuses a block ID, replaces the source placeholder, and
+   returns to the source note. Esc or **Cancel Smart Reference** cancels creation.
+4. Click the link in Reading View or Live Preview to navigate and temporarily
+   highlight the selected text. Highlights disappear after four seconds.
+
+**Jump to and highlight last precise reference (spike)** exercises the same
+navigation pipeline. Command names retain their spike labels; the broader guided
+four-level reference UI is not implemented.
+
+## Marker and storage
+
+```markdown
+[[Target#^block-id|display text]]<!--smart-ref:uuid-->
 ```
 
-This watches the source and rebuilds `main.js`; it does not automatically
-reload the plugin inside Obsidian.
+The adjacent HTML comment is invisible in Reading View. Alias edits do not change
+reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
+markers remain readable; markers separated into another paragraph require explicit
+relocation with their original refId. Notes are not automatically migrated.
 
-The generated `main.js` is intentionally ignored by Git. The checked-in
-source of the plugin is `main.ts` and the build configuration is
-`esbuild.config.mjs`.
+Plugin data stores refId, target file, block ID, selected text, offsets and prefix/
+suffix context. Metadata format is unchanged. With the plugin disabled, the Wiki
+Link still supports native block navigation.
 
-## Manual loading in a test Vault
+## Architecture
 
-Use a dedicated test Vault rather than a production Vault:
+### Reading View
 
-1. Build the project with `npm run build`.
-2. Create the directory `<test-vault>/.obsidian/plugins/obsidian-reference-plugin/`.
-3. Copy `manifest.json`, `styles.css`, and the generated `main.js` into that directory.
-4. Open the test Vault in Obsidian.
-5. Open **Settings → Community plugins**, enable community plugins if needed,
-   and enable **Obsidian Reference Plugin**.
-6. Confirm that the plugin loads without an error in the developer console.
-7. Disable the plugin and confirm that it unloads without an error.
+A Markdown postprocessor annotates rendered links as an optimization. On click,
+the handler checks `data-smart-ref-id`, an adjacent DOM comment, then current
+Markdown from the containing view. The source fallback pairs resolved target
+path/block ID and link order, counting ordinary links too. It never waits for
+annotation; ambiguous count mismatches retain native navigation.
 
-## Smart Reference commands
+After navigation, the locator finds the block in Markdown. Obsidian renders its
+current source into a detached container; normalized full block text identifies a
+unique paragraph/list item in the target preview. No DOM block-ID attribute is
+required. Selected text and context map to Text nodes; a DOM Range wraps each
+matching node portion. Cleanup removes the temporary spans without editing Markdown.
 
-- **Create Smart Reference (precise text spike)** inserts a persistent
-  placeholder, opens a fuzzy Markdown-note picker, and enters exact-selection
-  mode. Select text and press Enter; Esc cancels and removes the placeholder.
-- **Jump to and highlight last precise reference (spike)** reopens the most
-  recently created target and applies a four-second, non-destructive editor
-  decoration.
-- **Cancel Smart Reference** cleans up an unfinished placeholder, including
-  after navigation or plugin reload.
+### Live Preview
 
-Clicking a generated Smart Reference now triggers enhanced navigation in Live
-Preview and Reading View when its adjacent `<!--smart-ref:<id>-->` metadata can be
-resolved. Ordinary Wiki Links and unresolved Smart References are left to
-Obsidian's native link handler.
+The capture click handler recognizes `.cm-hmd-internal-link` spans and nested
+`.cm-underline` clicks as well as existing anchor links. It finds the containing
+MarkdownView and `.cm-line`, maps CodeMirror DOM positions to current source, and
+uses the shared Wiki Link/marker parser. A source position inside the link is
+preferred; complete line counts and order provide a conservative fallback.
 
-These remain technical-spike commands, not the final four-level user experience.
-The creation flow and navigation after Source and alias edits have been manually
-validated. Runtime logs now show that clicks can arrive before Reading View
-annotation finishes. Clicks therefore resolve refId directly from current source
-when DOM metadata is absent. Filter the console for `[Smart Reference] click
-resolution` to confirm which path ran before inspecting target highlight results.
-Use a disposable test Vault. Current manual checks are:
+Both views share metadata/target validation and `navigator.navigate(reference)`.
+Native clicks are canceled only after those checks pass.
 
-1. Run the exact selection-confirmation regression:
-   `Choose Target → modal closes without cancelling pending state or removing the
-   source placeholder → Target opens → select text → Enter → selection is captured before editor
-   mutation → block ID is created/reused → source placeholder is replaced →
-   workflow returns to the source note`.
-   Confirm that target selection settles once even though Obsidian invokes modal
-   close and choose callbacks during the same lifecycle.
-2. Create a reference to text inside a normal paragraph and confirm the source
-   receives a native `[[Note#^block-id|Alias]]` plus hidden ref marker.
-3. Repeat with an existing block ID and confirm no duplicate is added.
-4. Cancel from the picker and from the target note; confirm the source has no
-   orphan placeholder.
-5. In Live Preview, click a generated Smart Reference with an unchanged target;
-   confirm only the selected words highlight, the target scrolls into view, and
-   the temporary highlight disappears. Confirm the log reports locator `exact`
-   and applied `exact`. Repeat in Reading View, including a phrase split by
-   Markdown formatting into multiple rendered text nodes. Confirm only the
-   chosen words highlight and cleanup restores the original rendered DOM. If a
-   whole block highlights, record the locator and rendered-DOM fallback logs.
-6. Repeat selection with a simple list item and record whether native block
-   navigation resolves correctly in the installed Obsidian version.
-7. Return to Source and, one at a time, insert text before the Smart Reference,
-   insert text after it, edit unrelated text elsewhere, and edit its alias while
-   preserving the target and `%%ref:id%%`. Click after each edit in Live Preview;
-   enhanced highlighting must still occur. Repeat alias change in Reading View.
-   Save/reopen Source between cases if needed to exercise rerendering. Test an
-   ordinary Wiki Link to the same target beside the Smart Reference; only the
-   Smart Reference should enhance. Inspect association debug logs on failure.
-8. Run the manual highlight command and confirm it still follows the same path.
-9. Temporarily disable the plugin and click the same link; confirm Obsidian still
-   opens the native block target.
-10. With the plugin enabled, delete the stored reference or move its target and
-   confirm the click falls through to native navigation without an exception.
-11. Deliberately insert non-whitespace text between the Wiki Link and its
-    `%%ref:id%%` marker. Enhanced association should stop, while the native
-    block link should continue to navigate. Restore adjacency afterward.
+### Editor decorations
 
-## Reference marker format
+For Live Preview/Source editor targets, the locator validates stored offsets,
+searches selectedText within its block, then uses prefix/suffix to disambiguate.
+Recovered offsets pass through `editor.offsetToPos()` into CodeMirror document
+positions. A CM6 StateField applies `Decoration.mark`, verifies the resulting range,
+maps it through edits, and removes it after the timer. Unrecoverable exact text
+falls back to the block range. Raw Source link-click interception is not added;
+editor highlighting works when the existing navigation/command opens that target.
 
-New references use `[[Target#^block|alias]]<!--smart-ref:uuid-->`. Keep the comment
-beside the link; it is invisible in Reading View. Alias edits preserve identity.
-Legacy same-line `%%ref:id%%` remains readable. Old markers in separate paragraphs
-must be moved beside their corresponding links; reuse the same refId. The plugin
-preserves the existing reference store and does not migrate note content automatically.
+## Diagnostics
+
+Normal builds are quiet. For troubleshooting, set `SMART_REFERENCE_DEBUG` to `true`
+in `src/debug.ts`, rebuild and reload the plugin, then filter the developer console
+for `[Smart Reference]`. Restore `false` before integration/release builds.
+
+Logs include click resolution path, locator result, container/range mapping,
+decoration application and fallback reasons. Debug output includes note text and
+reference context. There is no new setting or stored metadata field.
+
+## Known limitations
+
+- Missing metadata/targets or ambiguous association leave native navigation intact.
+- Repeated targets with incomplete rendering/count mismatches may remain native.
+- Identical full rendered paragraphs cannot be safely distinguished for Reading
+  View highlighting. A missing/ambiguous container reports unavailable highlighting.
+- Embedded-note source is not inferred from its host. Complex Markdown, plugin-
+  generated DOM, mixed link syntax, and multi-block selections need further coverage.
+- Core selection support targets paragraphs and single-line list items. Source
+  parsing is a lightweight Wiki Link parser, not a full Markdown syntax parser.
+- The editor bridge uses `editor.cm`; Obsidian compatibility remains a runtime risk.
+- Target rename/move repair, metadata migration and fuzzy text recovery are deferred.
+
+## Integration regression checks
+
+Recheck creation/cancellation, Reading View exact highlighting, Live Preview alias
+clicks, source/alias edits, ordinary same-target links, block fallback, timed cleanup
+and plugin-disabled native links. Source-mode targets, complex formatting, repeated
+paragraphs and mixed links remain useful extended coverage. See
+`docs/CURRENT_STATUS.md`, `docs/TASKS.md`, and `docs/DECISIONS.md` for the handoff.

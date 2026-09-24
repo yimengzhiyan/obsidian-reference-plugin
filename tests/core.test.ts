@@ -1,3 +1,4 @@
+import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
 import { EditorState, StateEffect, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
 import { toEditorHighlightRange } from "../src/editor-range.ts";
@@ -538,4 +539,12 @@ test("Live Preview ordinary links never borrow a neighboring Smart Reference", (
   const source = "[[Target#^block|ordinary]] [[Target#^block|alias]]<!--smart-ref:uuid-->";
   assert.equal(resolveLivePreviewSpanLink(source, 0, source.indexOf("ordinary"), 1, 2), null);
   assert.equal(resolveLivePreviewSpanLink(source, -1, null, 0, 1), null);
+});
+
+
+test("integration builds disable diagnostics without evaluating note-text payloads", () => {
+  assert.equal(SMART_REFERENCE_DEBUG, false);
+  let evaluated = false;
+  debugLog(() => { evaluated = true; return ["private note text"]; });
+  assert.equal(evaluated, false);
 });

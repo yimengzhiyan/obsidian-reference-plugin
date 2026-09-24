@@ -813,3 +813,21 @@ editor/cm-line positions and existing Wiki Link parsing; use complete line ordin
 mapping only when counts agree. Do not borrow metadata from ordinary links.
 Share the existing metadata checks/navigation pipeline with the anchor handler.
 Reading View handling and both highlight algorithms remain unchanged.
+
+
+## D-042 — Validated workflow and integration diagnostics policy
+
+**Status:** Core workflow user-verified in real Obsidian; prepared for integration
+
+Reading View click resolution/exact DOM Ranges and Live Preview span interception,
+refId resolution, editor navigation/exact CM6 decorations are confirmed working.
+This supersedes earlier runtime-pending statements for the core paths, not the
+broader edge-case coverage. Retain all functional fixes and the separate view
+strategies documented in README. No metadata/UI redesign is part of integration.
+
+All runtime diagnostics use src/debug.ts with SMART_REFERENCE_DEBUG=false by
+default. Payloads are lazy to avoid text collection and layout reads while off.
+Troubleshooting requires enabling the source flag, rebuilding and reloading; reset
+it before integration/release. No settings UI or metadata schema change is needed.
+Known ambiguity, parser, embedded-note, editor bridge and rename/move limitations
+remain explicit. Merge requires separate user authorization.

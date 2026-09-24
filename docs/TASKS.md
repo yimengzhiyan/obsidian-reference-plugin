@@ -2,6 +2,20 @@
 
 本文件按 milestone 组织开发任务。
 
+## Current integration checkpoint
+
+- [x] User-verified Reading View click resolution and exact DOM Range highlighting
+- [x] User-verified Live Preview span click/refId resolution/navigation/exact CM6 decoration
+- [x] Review accumulated functional fixes and retain behavior
+- [x] Gate temporary diagnostics behind a disabled-by-default lazy debug logger
+- [x] Document architectures and known limitations in README/current status/decisions
+- [x] Run tests, typecheck, build and diff checks
+- [ ] Integration review and explicit authorization before merging main
+
+Historical milestone checklists below retain broader unverified edge cases; the
+core end-to-end milestone above is complete.
+
+
 每个 milestone 应尽量形成可独立 review 的 commit / PR。
 
 ---
@@ -657,7 +671,7 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Log all five resolution paths
 - [x] Six pure association tests and full tests/typecheck/build/diff checks
 - [ ] Real Obsidian: unannotated click, alias/source edits, ordinary/ambiguous links
-- [ ] Confirm enhanced navigation before evaluating target exact-highlight logs
+- [x] Confirm enhanced navigation before evaluating target exact-highlight logs (user verified)
 
 
 ## Editor exact highlighting
@@ -674,8 +688,8 @@ adjacency by design; the native Wiki Block Link remains valid.
 
 - [x] Add full Editor locator and decoration-input diagnostics
 - [x] Chinese exact-recovery tests: changed context, invalid offsets, repeats, fallback
-- [ ] Capture failing runtime logs and distinguish locator from decoration range failure
-- [ ] Apply a minimal evidence-based fix, then validate in Obsidian
+- [x] Diagnose reported failure: Live Preview span clicks bypassed anchor-only interception
+- [x] Apply span click interception; user verified exact editor highlighting
 
 
 ## Live Preview span click interception
@@ -685,5 +699,5 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Resolve target/refId using current CM source offsets and safe line order
 - [x] Reuse navigation and add detection/resolution diagnostics
 - [x] Pure tests and tests/typecheck/build/diff checks
-- [ ] Real Obsidian: alias click opens target and executes Editor highlight
-- [ ] Real Obsidian: Reading View exact highlight regression check
+- [x] Real Obsidian: alias click opens target and executes exact Editor highlight
+- [x] Real Obsidian: Reading View exact highlight regression check

@@ -1,3 +1,4 @@
+import { debugLog } from "./debug.ts";
 import { Component, Editor, MarkdownRenderer, MarkdownView, Notice, TFile, type App } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import { StateEffect } from "@codemirror/state";
@@ -34,11 +35,11 @@ export class SmartReferenceNavigator {
     if (!view || view.file?.path !== file.path) return "unsupported-view";
 
     const mode = view.getMode();
-    console.debug("[Smart Reference] target view", { mode, targetPath: file.path });
+    debugLog(() => ["[Smart Reference] target view", { mode, targetPath: file.path }]);
     const currentText = mode === "source" ? view.editor.getValue() : view.getViewData();
     const location = locateReference(currentText, reference);
     if (mode === "source") {
-      console.debug("[Smart Reference] Editor locator", {
+      debugLog(() => ["[Smart Reference] Editor locator", {
         mode,
         targetPath: file.path,
         refId: reference.refId,
@@ -51,9 +52,9 @@ export class SmartReferenceNavigator {
         locatedText: location.kind === "missing-block" ? null : currentText.slice(location.range.from, location.range.to),
         prefix: reference.prefix,
         suffix: reference.suffix,
-      });
+      }]);
     }
-    console.debug("[Smart Reference] target locator", { refId: reference.refId, kind: location.kind });
+    debugLog(() => ["[Smart Reference] target locator", { refId: reference.refId, kind: location.kind }]);
     if (location.kind === "missing-block") return "missing-block";
 
     this.cancelHighlight();
@@ -65,12 +66,12 @@ export class SmartReferenceNavigator {
     this.clearHighlight = applied.cleanup;
     this.highlightTimer = window.setTimeout(() => this.cancelHighlight(), HIGHLIGHT_DURATION_MS);
     const result = classifyHighlightResult(location.kind, applied.kind);
-    console.debug("[Smart Reference] highlight applied", {
+    debugLog(() => ["[Smart Reference] highlight applied", {
       refId: reference.refId,
       locatorKind: location.kind,
       appliedKind: applied.kind,
       result,
-    });
+    }]);
     return result;
   }
 
@@ -110,10 +111,10 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
   const mode = view.getMode();
   const targetPath = view.file?.path ?? null;
   const report = (range: { from: number; to: number } | null, success: boolean, reason: string | null) =>
-    console.debug("[Smart Reference] Editor highlight", {
+    debugLog(() => ["[Smart Reference] Editor highlight", {
       mode, targetPath, from: range?.from ?? null, to: range?.to ?? null,
       locatorKind: location.kind, success, decorationApplied: success, reason,
-    });
+    }]);
   const cm = getCodeMirrorView(view.editor);
   if (!cm) {
     report(null, false, "codemirror-view-unavailable");
@@ -131,13 +132,13 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
       effects.push(StateEffect.appendConfig.of(preciseHighlightField));
     }
     effects.push(setPreciseHighlight.of(range), EditorView.scrollIntoView(range.from, { y: "center" }));
-    console.debug("[Smart Reference] Editor decoration input", {
+    debugLog(() => ["[Smart Reference] Editor decoration input", {
       targetPath,
       locatorRange: location.range,
       codeMirrorRange: range,
       decoratedText: cm.state.doc.sliceString(range.from, range.to),
       codeMirrorTextLength: cm.state.doc.length,
-    });
+    }]);
     cm.dispatch({ effects });
     const decorations = cm.state.field(preciseHighlightField, false);
     let applied = false;
@@ -152,7 +153,7 @@ function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult
     };
   } catch (error) {
     report(range, false, "decoration-dispatch-failed");
-    console.debug("[Smart Reference] Editor highlight exception", { targetPath, error });
+    debugLog(() => ["[Smart Reference] Editor highlight exception", { targetPath, error }]);
     return null;
   }
 }
@@ -163,45 +164,45 @@ async function highlightReadingView(
   reference: PreciseReference,
   location: Exclude<LocateResult, { kind: "missing-block" }>,
 ): Promise<AppliedHighlight | null> {
-  console.debug("[Smart Reference] Reading View reference", {
+  debugLog(() => ["[Smart Reference] Reading View reference", {
     refId: reference.refId,
     blockId: reference.blockId,
     selectedText: reference.selectedText,
     prefix: reference.prefix,
     suffix: reference.suffix,
     locatorKind: location.kind,
-  });
+  }]);
   try {
     await nextAnimationFrame();
     const preview = view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
     if (!preview) {
-      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "preview-missing" });
+      debugLog(() => ["[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "preview-missing" }]);
       return null;
     }
     const sourceBlock = findBlockById(view.getViewData(), reference.blockId);
     const block = sourceBlock ? await findReadingContainer(app, view, preview, sourceBlock.text) : null;
-    console.debug("[Smart Reference] Reading View container", {
+    debugLog(() => ["[Smart Reference] Reading View container", {
       refId: reference.refId,
       renderedContainerFound: block !== null,
       sourceBlockFrom: sourceBlock?.from ?? null,
       sourceBlockTo: sourceBlock?.to ?? null,
-    });
+    }]);
     if (!block) {
-      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "rendered-container-missing-or-ambiguous" });
+      debugLog(() => ["[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: null, exactHighlightSuccess: false, fallbackReason: "rendered-container-missing-or-ambiguous" }]);
       return null;
     }
-    console.debug("[Smart Reference] Reading View target block", {
+    debugLog(() => ["[Smart Reference] Reading View target block", {
       refId: reference.refId,
       blockTag: block.tagName,
       blockClass: block.className,
       textContent: block.textContent,
       innerText: block.innerText,
-    });
+    }]);
 
     if (location.kind === "block-only") {
       block.classList.add("smart-ref-reading-highlight");
       block.scrollIntoView({ block: "center" });
-      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason: "source-locator-block-only" });
+      debugLog(() => ["[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason: "source-locator-block-only" }]);
       return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
     }
 
@@ -209,16 +210,16 @@ async function highlightReadingView(
     if (spans.length === 0) {
       block.classList.add("smart-ref-reading-highlight");
       block.scrollIntoView({ block: "center" });
-      console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason });
+      debugLog(() => ["[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "block", exactHighlightSuccess: false, fallbackReason }]);
       return { kind: "block", cleanup: () => block.classList.remove("smart-ref-reading-highlight") };
     }
     spans[0].scrollIntoView({ block: "center" });
-    console.debug("[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "exact", exactHighlightSuccess: true, fallbackReason: null, wrappedSpanCount: spans.length });
+    debugLog(() => ["[Smart Reference] Reading View result", { refId: reference.refId, appliedKind: "exact", exactHighlightSuccess: true, fallbackReason: null, wrappedSpanCount: spans.length }]);
     return { kind: "exact", cleanup: () => {
       unwrapTextSpans(block, spans);
     } };
   } catch (error) {
-    console.debug("[Smart Reference] Reading View exception", { refId: reference.refId, error });
+    debugLog(() => ["[Smart Reference] Reading View exception", { refId: reference.refId, error }]);
     throw error;
   }
 }
@@ -266,11 +267,11 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
     nodes.push(node);
     combined += node.data;
   }
-  console.debug("[Smart Reference] Reading View text nodes", {
+  debugLog(() => ["[Smart Reference] Reading View text nodes", {
     refId: reference.refId,
     count: nodes.length,
     nodes: nodes.map((node, index) => ({ index, textContent: node.textContent })),
-  });
+  }]);
   const found = findRenderedTextRange(combined, reference.selectedText, reference.prefix, reference.suffix);
   const normalizedSelectedText = reference.selectedText.replace(/\s+/gu, " ").trim();
   const normalizedRenderedText = combined.replace(/\s+/gu, " ");
@@ -284,7 +285,7 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
       cursor = index + normalizedSelectedText.length;
     }
   }
-  console.debug("[Smart Reference] Reading View match", {
+  debugLog(() => ["[Smart Reference] Reading View match", {
     refId: reference.refId,
     normalizedSelectedText,
     normalizedRenderedText,
@@ -293,7 +294,7 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
     matchedEnd: found?.to ?? null,
     positionUnit: "UTF-16 offset in concatenated DOM text nodes",
     wrappingMethod: "per-text-node DOM Range",
-  });
+  }]);
   if (!found) {
     const fallbackReason = nodes.length === 0 ? "no-text-nodes"
       : !normalizedSelectedText ? "empty-selected-text"
@@ -303,7 +304,7 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
   }
   const spans: HTMLElement[] = [];
   const segments = mapTextRangeToSegments(nodes.map((node) => node.data), found);
-  console.debug("[Smart Reference] Reading View segments", { refId: reference.refId, segments });
+  debugLog(() => ["[Smart Reference] Reading View segments", { refId: reference.refId, segments }]);
   if (segments.length === 0) return { spans, fallbackReason: "matched-range-has-no-text-segments" };
   try {
     for (const segment of segments) {
@@ -318,11 +319,11 @@ function wrapText(root: HTMLElement, reference: PreciseReference): RenderedWrapR
       spans.push(span);
     }
   } catch (error) {
-    console.debug("[Smart Reference] Reading View wrapping exception", { refId: reference.refId, error });
+    debugLog(() => ["[Smart Reference] Reading View wrapping exception", { refId: reference.refId, error }]);
     unwrapTextSpans(root, spans);
     return { spans: [], fallbackReason: "text-node-wrapping-exception" };
   }
-  console.debug("[Smart Reference] Reading View ranges", { refId: reference.refId, domRangeCreated: spans.length > 0, count: spans.length });
+  debugLog(() => ["[Smart Reference] Reading View ranges", { refId: reference.refId, domRangeCreated: spans.length > 0, count: spans.length }]);
   return { spans, fallbackReason: null };
 }
 

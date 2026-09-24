@@ -1,3 +1,4 @@
+import { debugLog } from "./src/debug.ts";
 import {
   Editor,
   FuzzyMatch,
@@ -59,18 +60,18 @@ export default class ReferencePlugin extends Plugin {
         this.app.metadataCache.getFirstLinkpathDest(path, context.sourcePath)?.path ?? path
       );
       if (!section) {
-        console.debug("[Smart Reference] Reading View annotation: DOM comments only; section unavailable", {
+        debugLog(() => ["[Smart Reference] Reading View annotation: DOM comments only; section unavailable", {
           sourcePath: context.sourcePath,
-        });
+        }]);
         return;
       }
       if (section.text.includes("<!--smart-ref:") || section.text.includes("%%ref:")) {
-        console.debug("[Smart Reference] Reading View link annotation", {
+        debugLog(() => ["[Smart Reference] Reading View link annotation", {
           sourcePath: context.sourcePath,
           lineStart: section.lineStart,
           lineEnd: section.lineEnd,
           annotated: element.querySelectorAll("a[data-smart-ref-id]").length,
-        });
+        }]);
       }
     });
 
@@ -129,10 +130,10 @@ export default class ReferencePlugin extends Plugin {
     await targetLeaf.openFile(file);
     this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
     if (!(targetLeaf.view instanceof MarkdownView)) {
-      console.debug("[Smart Reference] Target leaf did not resolve to MarkdownView", {
+      debugLog(() => ["[Smart Reference] Target leaf did not resolve to MarkdownView", {
         expectedTargetPath: file.path,
         viewType: targetLeaf.view.getViewType(),
-      });
+      }]);
       new Notice("Target note opened without an editable Markdown view. Cancel and try again.");
       return;
     }
@@ -230,13 +231,13 @@ export default class ReferencePlugin extends Plugin {
     activeView: MarkdownView | null,
     retainedView: MarkdownView | null,
   ): void {
-    console.debug("[Smart Reference] Selection confirmation context failure", {
+    debugLog(() => ["[Smart Reference] Selection confirmation context failure", {
       reason: context.kind,
       expectedTargetPath: this.selectionTargetPath,
       activeTargetPath: activeView?.file?.path ?? null,
       retainedTargetPath: retainedView?.file?.path ?? null,
       pendingOperationId: this.store.pending?.id ?? null,
-    });
+    }]);
 
     if (context.kind === "missing-pending") {
       new Notice("Smart Reference operation state is missing. Cancel and start again.");
@@ -320,10 +321,10 @@ export default class ReferencePlugin extends Plugin {
       const resolved = lineOffset === null ? null : resolveLivePreviewSpanLink(
         view.editor.getValue(), lineOffset, getEditorSourceOffset(view, link), spans.indexOf(link), spans.length,
       );
-      console.debug("[Smart Reference] Live Preview click detected", {
+      debugLog(() => ["[Smart Reference] Live Preview click detected", {
         className: link.className, sourcePath: view.file?.path ?? null, target: resolved?.target ?? null,
-      });
-      console.debug("[Smart Reference] Live Preview ref resolved", { refId: resolved?.refId ?? null });
+      }]);
+      debugLog(() => ["[Smart Reference] Live Preview ref resolved", { refId: resolved?.refId ?? null }]);
       if (resolved) await this.navigateClickedReference(event, resolved.refId);
       return;
     }
@@ -344,11 +345,11 @@ export default class ReferencePlugin extends Plugin {
         if (refId) resolutionPath = "live-preview-source-resolution";
       }
     }
-    console.debug("[Smart Reference] click resolution", {
+    debugLog(() => ["[Smart Reference] click resolution", {
       path: resolutionPath,
       refId,
       href: anchor.dataset.href || anchor.getAttribute("href"),
-    });
+    }]);
     if (!refId) return;
     await this.navigateClickedReference(event, refId);
   }
@@ -356,16 +357,16 @@ export default class ReferencePlugin extends Plugin {
   private async navigateClickedReference(event: MouseEvent, refId: string): Promise<void> {
     const reference = this.store.getReference(refId);
     if (!reference) {
-      console.debug("[Smart Reference] click resolution", { path: "unresolved-native-fallback", reason: "metadata-missing", refId });
+      debugLog(() => ["[Smart Reference] click resolution", { path: "unresolved-native-fallback", reason: "metadata-missing", refId }]);
       return;
     }
     if (!this.navigator.hasTarget(reference)) {
-      console.debug("[Smart Reference] click resolution", {
+      debugLog(() => ["[Smart Reference] click resolution", {
         path: "unresolved-native-fallback",
         reason: "target-missing",
         refId,
         targetPath: reference.targetFile,
-      });
+      }]);
       return;
     }
 
@@ -401,7 +402,7 @@ export default class ReferencePlugin extends Plugin {
   private findLivePreviewRefId(view: MarkdownView, anchor: HTMLAnchorElement): string | null {
     const target = anchor.dataset.href ?? anchor.getAttribute("data-href");
     if (!target) {
-      console.debug("[Smart Reference] clicked link has no data-href");
+      debugLog(() => ["[Smart Reference] clicked link has no data-href"]);
       return null;
     }
     const source = view.editor.getValue();
@@ -421,14 +422,14 @@ export default class ReferencePlugin extends Plugin {
       lineElement ? renderedMatches.length : null,
     );
     if (!refId) {
-      console.debug("[Smart Reference] Live Preview marker association failed", {
+      debugLog(() => ["[Smart Reference] Live Preview marker association failed", {
         target,
         sourcePath: view.file?.path ?? null,
         sourceOffset: offset,
         sourceLine: line,
         targetOrdinal: ordinal,
         renderedTargetCount: renderedMatches.length,
-      });
+      }]);
     }
     return refId;
   }

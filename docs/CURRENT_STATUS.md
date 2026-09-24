@@ -1,47 +1,47 @@
 # CURRENT_STATUS
 
+**Phase:** Smart Reference feature prepared for integration; not merged
 **Branch:** `codex/live-preview-click-interception`
-**Base:** `codex/editor-exact-highlight-fix` at c7c6c6f
-**Environment:** Linux/Codex; real Obsidian revalidation pending.
+**Environment:** Linux/Codex; real Obsidian workflow validation supplied by user
 
-## Confirmed root cause
+## Verified milestone
 
-Reading View exact highlighting works. Live Preview DOM inspection shows links as
-`.cm-hmd-internal-link.cm-link-alias` spans containing `.cm-underline`. The old
-anchor-only handler returned before Smart Reference navigation for those clicks.
-The observed block effect therefore does not establish an editor decoration bug.
+The full workflow works. Reading View resolves clicks and highlights exact text
+using DOM Ranges. Live Preview intercepts cm-hmd-internal-link clicks, resolves
+refId, opens the target and applies exact CodeMirror decorations. Earlier whole-
+block observations must not be treated as remaining confirmed highlight defects.
 
-## Implemented
+## Integration cleanup
 
-When no anchor is clicked, detect the closest `.cm-hmd-internal-link` span (including
-nested underline clicks). Find its containing source MarkdownView and cm-line.
-Map the span and line through CodeMirror to current editor source offsets. Reuse
-Wiki Link parsing to recover the target path/block ID and adjacent marker refId.
-A direct offset inside a link is preferred; otherwise complete line link counts
-and ordinal must agree. Ordinary links and ambiguous associations remain native.
+Reviewed the accumulated creation, marker/parser, view-specific click resolution,
+shared navigation, locator, DOM Range and CM6 decoration paths. Functional fixes
+are retained. Runtime diagnostics now use a shared lazy logger, disabled by default
+via SMART_REFERENCE_DEBUG=false in src/debug.ts. Payloads are not evaluated while
+disabled. Enable the source flag and rebuild/reload when investigating runtime issues.
 
-Both click paths share metadata/target checks and navigator.navigate(reference).
-Reading View anchor resolution is retained. Both highlight implementations,
-reference metadata, marker format and selection workflow are unchanged.
-
-Diagnostics: Live Preview click detected (className, sourcePath, target), followed
-by Live Preview ref resolved (refId, null when unresolved). Existing Editor locator
-and Editor highlight diagnostics remain for the now-reachable editor path.
+README documents Reading View source/DOM association, Live Preview source-offset
+resolution, editor decorations, fallback behavior, metadata and known limitations.
+Decisions remain historical; D-042 records the current validated integration state.
 
 ## Validation
 
-- npm test: 46 passed
+- npm test: 47 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
 
-Tests cover current span offsets, alias edits, preceding source edits, same-target
-ordinary links, ordinal fallback and ambiguous counts. Reading View association
-and highlight tests remain passing. No real Obsidian UI run was available here.
+The prior functional build is user-verified in Obsidian. This diagnostic/documentation
+cleanup is automatically checked; no new local Obsidian UI run was performed.
 
-## Next validation
+## Remaining limits
 
-In Live Preview click alias text and its nested underline. Confirm click detected,
-ref resolved, target opens, then Editor locator/Editor highlight execute. Repeat
-with changed aliases and ordinary same-target links. Regression-check Reading View
-exact highlighting. Keep runtime diagnostics until this is confirmed.
+Ambiguous source/rendered counts retain native navigation. Identical rendered blocks,
+partial rendering, embedded notes and complex/plugin-generated Markdown remain
+limited. Raw Source click interception, automatic legacy-marker migration and target
+rename/move recovery are deferred. The editor.cm bridge is a compatibility risk.
+See README for exact behavior and the integration regression checklist.
+
+## Next action
+
+Review this branch for integration and optionally smoke-test the quiet build in the
+same Vault. Merge only when explicitly authorized; no merge was performed.
