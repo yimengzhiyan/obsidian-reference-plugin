@@ -890,3 +890,15 @@ are also concealed in displayed text (including Wiki Link fragments); hrefs and
 underlying Markdown remain unchanged. Normal block IDs do not match. Diagnostic
 counts distinguish processed rows from complete hidden tokens. Do not claim runtime
 success from DOM fixtures; the private-DOM dependency still needs Vault validation.
+
+
+## D-048 — Keep Backlinks observation connected through rendering
+
+Supersedes D-047's pane-local observer lifecycle, not its selectors or marker logic.
+Use one persistent observer on the stable UI root. Re-read current panes/rows for
+render batches instead of relying on cached pane/row identities after navigation.
+Observe child/subtree changes plus text/class/visibility updates. Drain records
+from synchronous plugin cleanup to prevent feedback; do not disconnect/reconnect
+per cleanup. Unload is the only disconnect and restores wrappers. This prioritizes
+rerender correctness; scanning current Backlinks rows per mutation batch may cost
+more with large panels. Runtime Obsidian revalidation is still required.

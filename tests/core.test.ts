@@ -787,3 +787,53 @@ test("Backlinks pane observers handle opening, delayed text, note switches and r
   stop();
   assert.equal(replacement.textContent, 'Replacement %%ref:three%%');
 });
+
+test("Backlinks observer stays connected across click rerenders and later refreshes", async () => {
+  const { document, window } = backlinksFixture();
+  const NativeObserver = window.MutationObserver;
+  let disconnects = 0;
+  window.MutationObserver = class extends NativeObserver {
+    override disconnect() { disconnects++; super.disconnect(); }
+  };
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const stop = startBacklinksCleanup(document.body);
+  const link = document.querySelector('a')!;
+  let clicks = 0;
+  link.addEventListener('click', () => {
+    clicks++;
+    document.querySelector('.backlink-pane')!.outerHTML = '<div class="backlink-pane"><div class="search-result-container"><div class="search-result-file-match">Clicked %%ref:clicked%% ^sr-1234abcd</div></div></div>';
+  });
+  link.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  assert.equal(clicks, 1);
+  assert.equal(visibleSnippetText(document.body), 'Clicked  ');
+  const pane = document.querySelector('.backlink-pane')!;
+  for (let i = 0; i < 3; i++) {
+    pane.innerHTML = `<div class="search-result-container"><div class="search-result-file-match">Refresh ${i} &lt;!--smart-ref:refresh-${i}--&gt;</div></div>`;
+    await tick();
+    assert.equal(visibleSnippetText(pane), `Refresh ${i} `);
+  }
+  assert.equal(disconnects, 0, 'render cleanup must never disconnect observation');
+  stop();
+  assert.equal(disconnects, 1);
+  assert.equal(pane.textContent, 'Refresh 2 <!--smart-ref:refresh-2-->');
+});
+
+test("Backlinks persistent observer repairs refreshed wrapper visibility without looping", async () => {
+  const { document } = backlinksFixture();
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const stop = startBacklinksCleanup(document.body);
+  const pane = document.querySelector('.backlink-pane')!;
+  const hidden = pane.querySelector<HTMLElement>('.smart-ref-hidden-backlink-metadata')!;
+  hidden.hidden = false;
+  hidden.style.removeProperty('display');
+  await tick();
+  assert.equal(visibleSnippetText(pane), 'Alias   tail');
+  const currentWrapper = pane.querySelector<HTMLElement>('.smart-ref-hidden-backlink-metadata')!;
+  assert.equal(currentWrapper.hidden, true);
+  assert.equal(currentWrapper.style.display, 'none');
+  await tick();
+  assert.equal(pane.querySelector('.smart-ref-hidden-backlink-metadata'), currentWrapper,
+    'our own wrappers must not cause a repeated cleanup loop');
+  stop();
+});

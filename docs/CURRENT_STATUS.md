@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 59 passed
+- npm test: 61 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -148,3 +148,24 @@ Backlinks panel and verify navigation/exact highlighting in the Vault.
 Three pre-existing untracked files (.search-result-container,
 .search-result-file-match, .search-result-file-matched-text) were left untouched
 and excluded from the commit. No merge to main.
+
+
+## Persistent Backlinks cleanup lifecycle
+
+User verified initial note-open concealment, but markers reappeared after clicking
+a backlink. The exact runtime mutation sequence is not available locally. Replace
+pane observer registration/disconnection and affected-row inference with one
+persistent observer on the stable UI root. On each render mutation batch, rescan
+current .backlink-pane result rows using the unchanged concealment logic. Observe
+childList/subtree, text, and relevant visibility/class attributes. Drain synchronous
+cleanup records rather than disconnecting, so subsequent asynchronous rendering
+remains observed. Disconnect only on unload and restore hidden wrappers.
+
+Debug-only logs now include observer-trigger mutation count, cleanup reason,
+nodesScanned and markersHidden. No Markdown/store/navigation/highlighting/Live
+Preview changes. 61 tests, typecheck, build and diff checks pass. Tests reproduce
+click-triggered pane replacement and repeated refreshes, assert zero disconnects
+until unload, and verify no self-generated cleanup loop. Real Vault validation
+remains: open/switch notes, click backlinks repeatedly, refresh pane, verify hidden
+markers and unchanged navigation/highlighting. Private DOM and main-document
+limitations remain. Existing three untracked investigation files remain untouched.

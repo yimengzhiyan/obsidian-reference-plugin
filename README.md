@@ -99,21 +99,23 @@ editor highlighting works when the existing navigation/command opens that target
 
 ### Backlinks display
 
-Pane-local MutationObservers conceal complete `%%ref:id%%`, `<!--smart-ref:id-->`
+A persistent UI-root MutationObserver reapplies cleanup for complete `%%ref:id%%`, `<!--smart-ref:id-->`
 and generated `^sr-xxxxxxxx` text tokens within `.backlink-pane
 .search-result-file-match` rows. The full row is scanned, including nested
 `.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
 textContent, link elements, href attributes and native handlers; no Markdown or
 metadata is rewritten. Split tokens and delayed text updates are supported.
-A discovery observer attaches/detaches pane observers as panes open or are replaced.
-Plugin unload removes wrappers; Source and Live Preview are unchanged.
+Each render mutation batch rescans current Backlinks rows, including newly inserted
+panes and results after navigation. The observer stays connected during cleanup;
+its synchronous mutation records are drained to prevent feedback loops. Plugin
+unload disconnects it and removes wrappers; Source and Live Preview are unchanged.
 
 This depends on private Obsidian Backlinks DOM. The confirmed hierarchy is
 `.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
 `.search-result-file-matched-text`. Other layouts, global search, truncated markers,
 and separate pop-out documents are not covered. Debug logging reports cleanup
-reason, `matchedNodesCount` (result rows processed), and `hiddenMarkerCount`
-(complete tokens, not wrapper spans), including runs with zero matches.
+trigger/mutation count, cleanup reason, `nodesScanned` (result rows), and
+`markersHidden` (complete tokens, not wrapper spans), including zero-match runs.
 Real Vault validation remains pending for this repair.
 
 Future appearance, hover/focus and settings ideas are in

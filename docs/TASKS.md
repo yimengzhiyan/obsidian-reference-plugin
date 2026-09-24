@@ -753,3 +753,15 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] 59 tests, typecheck/build/diff check; note-open/switch DOM fixtures preserve clicks
 - [ ] Real Obsidian: panel after opening note and switching notes
 - [ ] Real Obsidian: normal backlinks and Smart Reference navigation/highlights intact
+
+
+## Backlinks navigation/rerender lifecycle
+
+- [x] User verified initial concealment; reported reappearance after backlink click
+- [x] Persistent observer rescans current rows across pane/result replacement
+- [x] Keep marker logic, navigation, highlighting and Live Preview unchanged
+- [x] Debug observer-trigger, nodes-scanned and markers-hidden logs
+- [x] Regression tests for actual click-triggered replacement, refreshes and no loops
+- [x] 61 tests, typecheck, build and diff check pass
+- [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
+- [ ] Real Vault: navigation and exact highlighting remain intact

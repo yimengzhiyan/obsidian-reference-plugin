@@ -49,85 +49,53 @@ export function concealBacklinkMatch(snippet: Element): number {
   return count;
 }
 
-/** Observe rendering inside one pane; keep original text and native handlers. */
-function observePane(pane: Element): () => void {
-  const Observer = pane.ownerDocument.defaultView!.MutationObserver;
-  const collect = (node: Node, rows: Set<Element>, descendants = false): void => {
-    const element = node.nodeType === 1 ? node as Element : node.parentElement;
-    if (!element) return;
-    const row = element.closest(MATCH);
-    if (row && pane.contains(row)) rows.add(row);
-    if (descendants) element.querySelectorAll(MATCH).forEach((match) => rows.add(match));
-  };
-  const clean = (rows: Set<Element>, reason: string): void => {
-    observer.disconnect();
-    let matchedNodesCount = 0;
-    let hiddenMarkerCount = 0;
-    try {
-      for (const row of rows) {
-        if (!pane.contains(row)) continue;
-        matchedNodesCount++;
-        // Reused rows may contain changed or now ordinary text.
-        reveal(row);
-        hiddenMarkerCount += concealBacklinkMatch(row);
-      }
-      debugLog(() => ["[Smart Reference] Backlinks cleanup", {
-        reason, matchedNodesCount, hiddenMarkerCount,
-      }]);
-    } finally {
-      observer.observe(pane, {
-        childList: true, characterData: true, subtree: true,
-        attributes: true, attributeFilter: ["class"],
-      });
-    }
-  };
-  const observer = new Observer((records) => {
-    const rows = new Set<Element>();
-    for (const record of records) {
-      collect(record.target, rows);
-      record.addedNodes.forEach((node) => collect(node, rows, true));
-    }
-    clean(rows, "pane-mutation");
-  });
-  clean(new Set(pane.querySelectorAll(MATCH)), "pane-attached");
-  return () => {
-    observer.disconnect();
-    reveal(pane);
-  };
-}
-
-/** Discover panes opened/replaced after startup; content observation stays pane-local. */
+/** Keep observing the stable UI root while Obsidian replaces panes and results. */
 export function startBacklinksCleanup(root: HTMLElement): () => void {
   const Observer = root.ownerDocument.defaultView!.MutationObserver;
-  const panes = new Map<Element, () => void>();
-  const discover = (node: Node): void => {
-    if (node.nodeType !== 1) return;
-    const element = node as Element;
-    const candidates = Array.from(element.querySelectorAll(PANE));
-    if (element.matches(PANE)) candidates.unshift(element);
-    for (const pane of candidates) {
-      if (root.contains(pane) && !panes.has(pane)) panes.set(pane, observePane(pane));
+  let stopped = false;
+  let panes = new Set<Element>();
+  const clean = (reason: string): void => {
+    if (stopped) return;
+    const currentPanes = new Set(root.querySelectorAll(PANE));
+    if (root.matches(PANE)) currentPanes.add(root);
+    for (const pane of panes) {
+      if (!currentPanes.has(pane)) reveal(pane);
     }
+    panes = currentPanes;
+    const rows = new Set<Element>();
+    for (const pane of panes) pane.querySelectorAll(MATCH).forEach((row) => rows.add(row));
+    let markersHidden = 0;
+    for (const row of rows) {
+      // Reconcile the current DOM, not cached row identities from before navigation.
+      reveal(row);
+      markersHidden += concealBacklinkMatch(row);
+    }
+    debugLog(() => ["[Smart Reference] Backlinks cleanup", {
+      reason, nodesScanned: rows.size, markersHidden,
+    }]);
+    // All writes above are synchronous. Discard only the records produced by this
+    // cleanup; remain subscribed to subsequent renders, including other observers.
+    observer.takeRecords();
   };
-  const discovery = new Observer((records) => {
-    for (const [pane, stop] of panes) {
-      if (!root.contains(pane) || !pane.matches(PANE)) {
-        stop();
-        panes.delete(pane);
-      }
-    }
-    for (const record of records) {
-      if (record.type === "attributes") discover(record.target);
-      record.addedNodes.forEach(discover);
-    }
+  const observer = new Observer((records) => {
+    if (stopped) return;
+    debugLog(() => ["[Smart Reference] Backlinks observer triggered", {
+      mutationCount: records.length,
+    }]);
+    // A refresh may rebuild any ancestor of a row. Re-read the current panes rather
+    // than guessing affected rows from the old nodes in the mutation records.
+    clean("render-mutation");
   });
-  discover(root);
-  discovery.observe(root, {
-    childList: true, subtree: true, attributes: true, attributeFilter: ["class"],
+  observer.observe(root, {
+    childList: true, subtree: true, characterData: true,
+    attributes: true, attributeFilter: ["class", "hidden", "style"],
   });
+  clean("initial-render");
   return () => {
-    discovery.disconnect();
-    for (const stop of panes.values()) stop();
+    stopped = true;
+    observer.disconnect();
+    for (const pane of panes) reveal(pane);
+    reveal(root);
     panes.clear();
   };
 }
