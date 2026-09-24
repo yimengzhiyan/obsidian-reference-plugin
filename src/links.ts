@@ -194,3 +194,24 @@ function findUnescapedAliasSeparator(linktext: string): number {
   }
   return -1;
 }
+
+
+/** Resolve CM-rendered spans without href or alias identity. Prefer a position
+ * inside a Wiki Link; otherwise require a complete same-line ordinal mapping. */
+export function resolveLivePreviewSpanLink(
+  source: string,
+  lineOffset: number,
+  clickedOffset: number | null,
+  ordinal: number,
+  renderedCount: number,
+): SmartReferenceLink | null {
+  if (!Number.isInteger(lineOffset) || lineOffset < 0 || lineOffset > source.length) return null;
+  const start = source.lastIndexOf("\n", lineOffset - 1) + 1;
+  const end = source.indexOf("\n", lineOffset);
+  const links = parseWikiLinks(source.slice(start, end < 0 ? source.length : end));
+  const direct = clickedOffset === null ? undefined : links.find((link) =>
+    clickedOffset >= start + link.from && clickedOffset < start + link.from + link.linktext.length + 4
+  );
+  const link = direct ?? (links.length === renderedCount && Number.isInteger(ordinal) && ordinal >= 0 ? links[ordinal] : undefined);
+  return link?.refId ? { ...link, refId: link.refId, from: start + link.from, to: start + link.to } : null;
+}

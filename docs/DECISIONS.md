@@ -803,3 +803,13 @@ Stored offsets are never blindly reapplied after locator recovery. Reuse the
 registered decoration field, installing it in the current state if absent, and
 verify the resulting mark before reporting success. Preserve block fallback and
 cleanup. Both Live Preview and Source share this editor strategy.
+
+
+## D-041 — Live Preview span clicks use current CodeMirror source
+
+Runtime DOM inspection confirms Live Preview internal links are spans, not anchors.
+Detect the closest cm-hmd-internal-link for nested clicks. Resolve through containing
+editor/cm-line positions and existing Wiki Link parsing; use complete line ordinal
+mapping only when counts agree. Do not borrow metadata from ordinary links.
+Share the existing metadata checks/navigation pipeline with the anchor handler.
+Reading View handling and both highlight algorithms remain unchanged.

@@ -13,6 +13,7 @@ import {
   findSmartReferenceAtOffset,
   parseSmartReferenceLinks,
   resolveLivePreviewReference,
+  resolveLivePreviewSpanLink,
   resolveReadingClickReference,
   resolveRenderedReferenceIds,
 } from "../src/links.ts";
@@ -513,4 +514,28 @@ test("Chinese editor recovery uses context for repeats and keeps block fallback 
   assert.equal(content.slice(location.range.from, location.range.to), selectedText);
   assert.equal(locateReference(content, { ...reference, prefix: "已删除", suffix: "已删除" }).kind, "block-only");
   assert.equal(locateReference("原文已经替换。 ^block-1", reference).kind, "block-only");
+});
+
+
+test("Live Preview spans resolve target and refId from current CodeMirror offsets", () => {
+  for (const alias of ["alias", "对异常现象", "edited alias"]) {
+    const source = `Unrelated edits\nPrefix [[Folder/Target#^block|${alias}]]<!--smart-ref:uuid--> tail`;
+    const resolved = resolveLivePreviewSpanLink(source, source.indexOf("Prefix"), source.indexOf(alias), 0, 1);
+    assert.equal(resolved?.target, "Folder/Target#^block");
+    assert.equal(resolved?.refId, "uuid");
+  }
+});
+
+test("Live Preview spans use complete line order when position maps before a link", () => {
+  const source = "[[Target#^block|ordinary]] [[Target#^block|alias]]<!--smart-ref:uuid-->";
+  assert.equal(resolveLivePreviewSpanLink(source, 0, null, 0, 2), null);
+  assert.equal(resolveLivePreviewSpanLink(source, 0, null, 1, 2)?.refId, "uuid");
+  assert.equal(resolveLivePreviewSpanLink(source, 0, null, 0, 1), null);
+  assert.equal(resolveLivePreviewSpanLink(source, 0, null, -1, 2), null);
+});
+
+test("Live Preview ordinary links never borrow a neighboring Smart Reference", () => {
+  const source = "[[Target#^block|ordinary]] [[Target#^block|alias]]<!--smart-ref:uuid-->";
+  assert.equal(resolveLivePreviewSpanLink(source, 0, source.indexOf("ordinary"), 1, 2), null);
+  assert.equal(resolveLivePreviewSpanLink(source, -1, null, 0, 1), null);
 });

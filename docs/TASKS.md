@@ -676,3 +676,14 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Chinese exact-recovery tests: changed context, invalid offsets, repeats, fallback
 - [ ] Capture failing runtime logs and distinguish locator from decoration range failure
 - [ ] Apply a minimal evidence-based fix, then validate in Obsidian
+
+
+## Live Preview span click interception
+
+- [x] Runtime diagnosis: Live Preview span links bypassed anchor-only handler
+- [x] Detect span and nested underline clicks
+- [x] Resolve target/refId using current CM source offsets and safe line order
+- [x] Reuse navigation and add detection/resolution diagnostics
+- [x] Pure tests and tests/typecheck/build/diff checks
+- [ ] Real Obsidian: alias click opens target and executes Editor highlight
+- [ ] Real Obsidian: Reading View exact highlight regression check

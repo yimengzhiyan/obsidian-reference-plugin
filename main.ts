@@ -17,6 +17,7 @@ import {
   resolveReadingClickReference,
   buildSmartReferenceLink,
   resolveLivePreviewReference,
+  resolveLivePreviewSpanLink,
 } from "./src/links.ts";
 import {
   getEditorSourceOffset,
@@ -307,7 +308,25 @@ export default class ReferencePlugin extends Plugin {
   private async handleSmartReferenceClick(event: MouseEvent): Promise<void> {
     if (!(event.target instanceof Element)) return;
     const anchor = event.target.closest<HTMLAnchorElement>("a");
-    if (!anchor) return;
+    if (!anchor) {
+      const link = event.target.closest<HTMLElement>(".cm-hmd-internal-link");
+      if (!link) return;
+      const view = this.findContainingMarkdownView(link);
+      if (!view || view.getMode() !== "source") return;
+      const line = link.closest<HTMLElement>(".cm-line");
+      const lineOffset = line ? getEditorSourceOffset(view, line) : null;
+      const spans = line ? Array.from(line.querySelectorAll<HTMLElement>(".cm-hmd-internal-link"))
+        .filter((candidate) => !candidate.parentElement?.closest(".cm-hmd-internal-link")) : [];
+      const resolved = lineOffset === null ? null : resolveLivePreviewSpanLink(
+        view.editor.getValue(), lineOffset, getEditorSourceOffset(view, link), spans.indexOf(link), spans.length,
+      );
+      console.debug("[Smart Reference] Live Preview click detected", {
+        className: link.className, sourcePath: view.file?.path ?? null, target: resolved?.target ?? null,
+      });
+      console.debug("[Smart Reference] Live Preview ref resolved", { refId: resolved?.refId ?? null });
+      if (resolved) await this.navigateClickedReference(event, resolved.refId);
+      return;
+    }
 
     let refId = anchor.dataset.smartRefId || null;
     let resolutionPath = refId ? "dom-attribute" : "unresolved-native-fallback";
@@ -331,6 +350,10 @@ export default class ReferencePlugin extends Plugin {
       href: anchor.dataset.href || anchor.getAttribute("href"),
     });
     if (!refId) return;
+    await this.navigateClickedReference(event, refId);
+  }
+
+  private async navigateClickedReference(event: MouseEvent, refId: string): Promise<void> {
     const reference = this.store.getReference(refId);
     if (!reference) {
       console.debug("[Smart Reference] click resolution", { path: "unresolved-native-fallback", reason: "metadata-missing", refId });
@@ -351,7 +374,7 @@ export default class ReferencePlugin extends Plugin {
     showNavigationResult(await this.navigator.navigate(reference));
   }
 
-  private findContainingMarkdownView(anchor: HTMLAnchorElement): MarkdownView | null {
+  private findContainingMarkdownView(anchor: HTMLElement): MarkdownView | null {
     const matchingViews: MarkdownView[] = [];
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(anchor)) {
