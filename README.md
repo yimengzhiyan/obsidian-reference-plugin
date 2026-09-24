@@ -99,17 +99,22 @@ editor highlighting works when the existing navigation/command opens that target
 
 ### Backlinks display
 
-A UI-only observer conceals complete `%%ref:id%%` and `<!--smart-ref:id-->`
-text tokens inside Backlinks/embedded linked-mention snippets. Hidden wrappers
-preserve textContent, link elements and native handlers; no Markdown or metadata
-is rewritten. Split search-match spans are supported. Rerenders are reprocessed,
-and plugin unload removes the wrappers. Source mode remains raw.
+Pane-local MutationObservers conceal complete `%%ref:id%%`, `<!--smart-ref:id-->`
+and generated `^sr-xxxxxxxx` text tokens within `.backlink-pane
+.search-result-file-match` rows. The full row is scanned, including nested
+`.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
+textContent, link elements, href attributes and native handlers; no Markdown or
+metadata is rewritten. Split tokens and delayed text updates are supported.
+A discovery observer attaches/detaches pane observers as panes open or are replaced.
+Plugin unload removes wrappers; Source and Live Preview are unchanged.
 
-This adapter depends on private Obsidian DOM selectors: `.backlink-pane`,
-`.embedded-backlinks`, `[data-type="backlink"]`, and
-`.search-result-file-matched-text`. DOM changes may leave markers visible. Global
-search, incomplete/truncated markers, and separate pop-out documents are not
-covered. Real Vault validation is pending for this adapter.
+This depends on private Obsidian Backlinks DOM. The confirmed hierarchy is
+`.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
+`.search-result-file-matched-text`. Other layouts, global search, truncated markers,
+and separate pop-out documents are not covered. Debug logging reports cleanup
+reason, `matchedNodesCount` (result rows processed), and `hiddenMarkerCount`
+(complete tokens, not wrapper spans), including runs with zero matches.
+Real Vault validation remains pending for this repair.
 
 Future appearance, hover/focus and settings ideas are in
 [the UI proposal](docs/UI_PROPOSAL.md); these are not implemented settings.

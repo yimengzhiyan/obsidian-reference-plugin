@@ -1,5 +1,5 @@
 import { JSDOM } from "jsdom";
-import { concealBacklinkSnippet, startBacklinksCleanup } from "../src/backlinks-cleanup.ts";
+import { concealBacklinkMatch, startBacklinksCleanup } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField } from "../src/metadata-hiding.ts";
 import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
@@ -664,7 +664,7 @@ function parseHTML(html: string) {
 }
 
 function backlinksFixture() {
-  return parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-matched-text"><a href="Target#^block">Alias</a> %%ref:legacy%% &lt;!--smart-<span class="search-result-file-match">ref:uuid</span>--&gt; tail</div></div></body></html>');
+  return parseHTML('<html><body><div class="backlink-pane"><div class="search-result-container"><div class="search-result-file-match"><div class="search-result-file-matched-text"><a href="Target#^block">Alias</a> %%ref:legacy%% &lt;!--smart-<span class="search-result-file-match-highlight">ref:uuid</span>--&gt; tail</div></div></div></div></body></html>');
 }
 
 function visibleSnippetText(element: Element): string {
@@ -675,12 +675,12 @@ function visibleSnippetText(element: Element): string {
 
 test("Backlinks hides split metadata and preserves text, links and event handlers", () => {
   const { document, window } = backlinksFixture();
-  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  const snippet = document.querySelector('.search-result-file-match')!;
   const source = snippet.textContent;
   const anchor = snippet.querySelector('a')!;
   let clicks = 0;
   anchor.addEventListener('click', () => clicks++);
-  assert.equal(concealBacklinkSnippet(snippet), 4);
+  assert.equal(concealBacklinkMatch(snippet), 2);
   assert.equal(visibleSnippetText(snippet), 'Alias   tail');
   assert.equal(snippet.textContent, source);
   assert.equal(snippet.querySelector('a'), anchor);
@@ -690,7 +690,7 @@ test("Backlinks hides split metadata and preserves text, links and event handler
   anchor.dispatchEvent(new window.Event('click'));
   assert.equal(clicks, 1);
   assert.equal(anchor.getAttribute('href'), 'Target#^block');
-  assert.equal(concealBacklinkSnippet(snippet), 0);
+  assert.equal(concealBacklinkMatch(snippet), 0);
 });
 
 test("Backlinks cleanup excludes editors, Reading View and global search", () => {
@@ -698,31 +698,31 @@ test("Backlinks cleanup excludes editors, Reading View and global search", () =>
   for (const containerClass of ['cm-editor', 'markdown-preview-view', 'search-view']) {
     const container = document.createElement('div');
     container.className = containerClass;
-    container.innerHTML = '<div class="search-result-file-matched-text">%%ref:keep%%</div>';
+    container.innerHTML = '<div class="search-result-file-match">%%ref:keep%%</div>';
     document.body.append(container);
     const snippet = container.firstElementChild!;
-    assert.equal(concealBacklinkSnippet(snippet), 0);
+    assert.equal(concealBacklinkMatch(snippet), 0);
     assert.equal(snippet.innerHTML, '%%ref:keep%%');
   }
 });
 
 test("Backlinks preserves ordinary comments, partial markers and real DOM comments", () => {
   const { document } = backlinksFixture();
-  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  const snippet = document.querySelector('.search-result-file-match')!;
   snippet.innerHTML = '%%comment%% %%smart-ref:pending%% &lt;!--ordinary--&gt; %%ref:partial <!--smart-ref:uuid-->';
   const before = snippet.innerHTML;
-  assert.equal(concealBacklinkSnippet(snippet), 0);
+  assert.equal(concealBacklinkMatch(snippet), 0);
   assert.equal(snippet.innerHTML, before);
 });
 
 test("Backlinks observer cleans new and reused results and restores wrappers on unload", async () => {
   const { document } = backlinksFixture();
   const stop = startBacklinksCleanup(document.body);
-  const snippet = document.querySelector('.search-result-file-matched-text')!;
+  const snippet = document.querySelector('.search-result-file-match')!;
   assert.equal(visibleSnippetText(snippet), 'Alias   tail');
   const embedded = document.createElement('div');
   embedded.className = 'embedded-backlinks';
-  embedded.innerHTML = '<div class="search-result-file-matched-text">New %%ref:new%% end</div>';
+  embedded.innerHTML = '<div class="backlink-pane"><div class="search-result-container"><div class="search-result-file-match"><div class="search-result-file-matched-text">New %%ref:new%% end</div></div></div></div>';
   document.body.append(embedded);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(visibleSnippetText(embedded), 'New  end');
@@ -740,4 +740,50 @@ test("Backlinks observer cleans new and reused results and restores wrappers on 
   snippet.textContent = '%%ref:after-unload%%';
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(snippet.innerHTML, '%%ref:after-unload%%');
+});
+
+test("Backlinks row cleanup hides all reserved tokens across nested and sibling text", () => {
+  const { document } = backlinksFixture();
+  const row = document.querySelector('.search-result-file-match')!;
+  row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-f3f81c62|科伊村]]</span>\n&lt;!--smart-<span>ref:e54d2638-1898-4422-b8b7-fcf864132fae</span>--&gt; %%ref:uuid%% ^sr-9134bc06 ^custom ^sr-short ^sr-9134bc060 ^sr-9134bc06-extra';
+  const original = row.textContent;
+  assert.equal(concealBacklinkMatch(row), 4);
+  assert.equal(visibleSnippetText(row), '[[Target#|科伊村]]\n   ^custom ^sr-short ^sr-9134bc060 ^sr-9134bc06-extra');
+  assert.equal(row.textContent, original);
+});
+
+test("Backlinks pane observers handle opening, delayed text, note switches and replacement", async () => {
+  const { document, window } = parseHTML('<html><body></body></html>');
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const stop = startBacklinksCleanup(document.body);
+  const pane = document.createElement('div');
+  pane.className = 'backlink-pane';
+  document.body.append(pane);
+  await tick();
+  pane.innerHTML = '<div class="search-result-container"><div class="search-result-file-match"><span class="search-result-file-matched-text"></span></div></div>';
+  await tick();
+  const text = document.createTextNode('loading');
+  pane.querySelector('.search-result-file-matched-text')!.append(text);
+  await tick();
+  text.data = 'Note one %%ref:one%% ^sr-1234abcd';
+  await tick();
+  assert.equal(visibleSnippetText(pane), 'Note one  ');
+  pane.innerHTML = '<div class="search-result-container"><div class="search-result-file-match"><a href="Target#^sr-1234abcd">Next note</a> &lt;!--smart-ref:two--&gt;</div></div>';
+  const link = pane.querySelector('a')!;
+  let navigated = false;
+  link.addEventListener('click', () => { navigated = true; });
+  await tick();
+  assert.equal(visibleSnippetText(pane), 'Next note ');
+  link.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  assert.equal(navigated, true);
+  assert.equal(link.getAttribute('href'), 'Target#^sr-1234abcd');
+  const replacement = document.createElement('div');
+  replacement.className = 'backlink-pane';
+  replacement.innerHTML = '<div class="search-result-file-match">Replacement %%ref:three%%</div>';
+  pane.replaceWith(replacement);
+  await tick();
+  assert.equal(visibleSnippetText(replacement), 'Replacement ');
+  assert.equal(pane.querySelectorAll('.smart-ref-hidden-backlink-metadata').length, 0);
+  stop();
+  assert.equal(replacement.textContent, 'Replacement %%ref:three%%');
 });

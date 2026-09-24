@@ -741,3 +741,15 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [ ] Real Vault: Source raw text, reference navigation and exact highlights unchanged
 - [ ] Real Vault: disable/re-enable restores/reapplies display cleanup
 - [ ] Review UI_PROPOSAL.md before implementing optional UI changes
+
+
+## Backlinks confirmed-DOM repair
+
+- [x] Record failed 54aa199 runtime validation and confirmed row hierarchy
+- [x] Scope cleanup to .backlink-pane .search-result-file-match
+- [x] Observe each pane for asynchronous rendering; attach/detach on pane replacement
+- [x] Hide both ref marker formats and generated eight-hex ^sr- anchors only
+- [x] Debug cleanup trigger, processed row count and hidden token count
+- [x] 59 tests, typecheck/build/diff check; note-open/switch DOM fixtures preserve clicks
+- [ ] Real Obsidian: panel after opening note and switching notes
+- [ ] Real Obsidian: normal backlinks and Smart Reference navigation/highlights intact

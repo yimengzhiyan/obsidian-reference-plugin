@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 57 passed
+- npm test: 59 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -124,3 +124,27 @@ paths, then disable plugin and confirm restoration. No new Obsidian UI run here.
 UI_PROPOSAL.md contains unimplemented reference appearance, hover/focus information,
 and settings ideas. Next step is real Backlinks validation and proposal review;
 no merge is authorized or performed.
+
+
+## Backlinks pane/row repair after DOM investigation
+
+User confirmed .backlink-pane > .search-result-container >
+.search-result-file-match > .search-result-file-matched-text and reported markers
+still visible in 54aa199. Replace snippet-only handling with full result-row
+handling scoped strictly to .backlink-pane. Each pane has a MutationObserver for
+child, text and class updates; a discovery observer manages added/replaced panes.
+Conceal complete legacy/HTML markers and generated ^sr-xxxxxxxx tokens, including
+visible link fragments, without changing hrefs, textContent or native handlers.
+Normal IDs and unrelated comments remain visible; Source/Live Preview untouched.
+
+Debug-only cleanup logs include reason, matchedNodesCount (processed result rows),
+and hiddenMarkerCount (tokens, independent of split wrapper count), even when zero.
+59 tests, typecheck, build and diff checks pass. Realistic fixtures cover note-open,
+delayed text updates, switching notes, pane replacement, ordinary-token exclusions
+and preserved click handlers/targets. This is automated DOM validation, not a real
+Obsidian navigation run. Next: reload the plugin, open/switch notes, inspect the
+Backlinks panel and verify navigation/exact highlighting in the Vault.
+
+Three pre-existing untracked files (.search-result-container,
+.search-result-file-match, .search-result-file-matched-text) were left untouched
+and excluded from the commit. No merge to main.

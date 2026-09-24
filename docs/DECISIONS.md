@@ -877,3 +877,16 @@ unload. Missing selectors or incomplete tokens stay visible instead of guessing.
 This depends on Obsidian's private Backlinks DOM and requires real-Vault validation.
 Initial scope is the main document; pop-out documents and global search are deferred.
 UI appearance/hover/settings work is a proposal only, with no stored-schema changes.
+
+
+## D-047 — Observe Backlinks panes and conceal full result rows
+
+Runtime investigation supersedes D-046's snippet-only matching and broad container
+aliases. Scope to .backlink-pane .search-result-file-match, scanning all row text
+including nested matched-text and sibling fragments. Observe each pane directly
+for asynchronous text/child/class updates, with a separate pane lifecycle observer.
+Detach removed panes and restore wrappers. Generated lowercase eight-hex ^sr- IDs
+are also concealed in displayed text (including Wiki Link fragments); hrefs and
+underlying Markdown remain unchanged. Normal block IDs do not match. Diagnostic
+counts distinguish processed rows from complete hidden tokens. Do not claim runtime
+success from DOM fixtures; the private-DOM dependency still needs Vault validation.
