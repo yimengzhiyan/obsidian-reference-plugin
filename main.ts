@@ -1,5 +1,5 @@
 import { debugLog } from "./src/debug.ts";
-import { startBacklinksCleanup } from "./src/backlinks-cleanup.ts";
+import { createBacklinksCleanupManager } from "./src/backlinks-cleanup.ts";
 import {
   Editor,
   editorLivePreviewField,
@@ -49,7 +49,19 @@ export default class ReferencePlugin extends Plugin {
     await this.store.load();
     this.registerEditorExtension(preciseHighlightField);
     this.registerEditorExtension(createMetadataHidingField(editorLivePreviewField));
-    this.register(startBacklinksCleanup(document.body));
+    const backlinks = createBacklinksCleanupManager();
+    const refreshBacklinks = () => {
+      backlinks.attach(document);
+      this.app.workspace.iterateAllLeaves((leaf) => backlinks.attach(leaf.view.containerEl.ownerDocument));
+      backlinks.refresh();
+    };
+    this.register(() => backlinks.destroy());
+    this.registerEvent(this.app.workspace.on("file-open", refreshBacklinks));
+    this.registerEvent(this.app.workspace.on("layout-change", refreshBacklinks));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", refreshBacklinks));
+    this.registerEvent(this.app.workspace.on("window-open", (_win, opened) => backlinks.attach(opened.document)));
+    this.registerEvent(this.app.workspace.on("window-close", (_win, closed) => backlinks.detach(closed.document)));
+    refreshBacklinks();
     this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event), {
       capture: true,
     });

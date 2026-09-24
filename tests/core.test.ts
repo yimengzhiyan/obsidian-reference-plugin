@@ -1,6 +1,6 @@
 import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
-import { concealBacklinkMatch, startBacklinksCleanup } from "../src/backlinks-cleanup.ts";
+import { concealBacklinkMatch, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField, renderedBlockTokenRanges } from "../src/metadata-hiding.ts";
 import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
@@ -907,4 +907,36 @@ test("CM6 renders hidden block-token decorations and reveals Source without losi
       else Reflect.deleteProperty(globalThis, name);
     }
   }
+});
+
+
+test("Backlinks workspace manager covers rebuilt bodies and secondary documents", async () => {
+  const main = backlinksFixture();
+  const secondary = backlinksFixture();
+  const manager = createBacklinksCleanupManager();
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  manager.attach(main.document);
+  manager.attach(secondary.document);
+  manager.attach(main.document); // Workspace events may rediscover an existing document.
+  assert.equal(visibleSnippetText(main.document.body), 'Alias   tail');
+  assert.equal(visibleSnippetText(secondary.document.body), 'Alias   tail');
+  const replacement = main.document.createElement('body');
+  replacement.innerHTML = '<div class="backlink-pane"><div class="search-result-file-match"><span class="search-result-file-matched-text">Switched &lt;!--smart-ref:uuid--&gt; %%ref:legacy%% ^sr-f3f81c62</span></div></div>';
+  main.document.body.replaceWith(replacement);
+  await tick();
+  assert.equal(visibleSnippetText(main.document.body), 'Switched   ');
+  secondary.document.querySelector('.search-result-file-match')!.textContent = 'Opened %%ref:new%%';
+  manager.refresh(); // file-open/layout-change refresh does not wait for observer delivery.
+  assert.equal(visibleSnippetText(secondary.document.body), 'Opened ');
+  manager.detach(secondary.document);
+  assert.equal(secondary.document.querySelector('.smart-ref-hidden-backlink-metadata'), null);
+  assert.equal(secondary.document.body.textContent, 'Opened %%ref:new%%');
+  manager.destroy();
+  assert.equal(main.document.querySelector('.smart-ref-hidden-backlink-metadata'), null);
+  manager.attach(main.document); // Late workspace events cannot restart a disposed manager.
+  manager.refresh();
+  await tick();
+  assert.equal(main.document.querySelector('.smart-ref-hidden-backlink-metadata'), null);
+  main.window.close();
+  secondary.window.close();
 });

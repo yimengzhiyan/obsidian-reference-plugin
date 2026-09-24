@@ -50,7 +50,9 @@ export function concealBacklinkMatch(snippet: Element): number {
 }
 
 /** Keep observing the stable UI root while Obsidian replaces panes and results. */
-export function startBacklinksCleanup(root: HTMLElement): () => void {
+export type BacklinksCleanup = (() => void) & { refresh(): void };
+
+export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   const Observer = root.ownerDocument.defaultView!.MutationObserver;
   let stopped = false;
   let panes = new Set<Element>();
@@ -71,7 +73,8 @@ export function startBacklinksCleanup(root: HTMLElement): () => void {
       markersHidden += concealBacklinkMatch(row);
     }
     debugLog(() => ["[Smart Reference] Backlinks cleanup", {
-      reason, nodesScanned: rows.size, markersHidden,
+      reason, panesFound: panes.size, matchedBacklinkRows: rows.size, hiddenMarkerCount: markersHidden,
+      rootConnected: root.isConnected,
     }]);
     // All writes above are synchronous. Discard only the records produced by this
     // cleanup; remain subscribed to subsequent renders, including other observers.
@@ -91,11 +94,42 @@ export function startBacklinksCleanup(root: HTMLElement): () => void {
     attributes: true, attributeFilter: ["class", "hidden", "style"],
   });
   clean("initial-render");
-  return () => {
+  const stop = () => {
     stopped = true;
     observer.disconnect();
     for (const pane of panes) reveal(pane);
     reveal(root);
     panes.clear();
+  };
+  return Object.assign(stop, { refresh: () => clean("workspace-refresh") });
+}
+
+
+/** Backlinks may live in a workspace document other than the main editor window. */
+export function createBacklinksCleanupManager() {
+  const documents = new Map<Document, { root: HTMLElement; cleanup: BacklinksCleanup }>();
+  let stopped = false;
+  const detach = (doc: Document) => {
+    documents.get(doc)?.cleanup();
+    documents.delete(doc);
+  };
+  return {
+    attach(doc: Document): void {
+      if (stopped || !doc.defaultView || !doc.documentElement) return;
+      const root = doc.documentElement;
+      if (documents.get(doc)?.root === root) return;
+      detach(doc);
+      // Observe above body so a rebuilt workspace/body cannot orphan the observer.
+      documents.set(doc, { root, cleanup: startBacklinksCleanup(root) });
+    },
+    detach,
+    refresh(): void {
+      if (stopped) return;
+      for (const { cleanup } of documents.values()) cleanup.refresh();
+    },
+    destroy(): void {
+      stopped = true;
+      for (const doc of documents.keys()) detach(doc);
+    },
   };
 }

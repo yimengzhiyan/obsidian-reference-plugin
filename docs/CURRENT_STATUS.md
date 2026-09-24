@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 63 passed
+- npm test: 64 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -193,3 +193,26 @@ and locator tests remain green. This is not a real Obsidian UI run. Next: instal
 the build, verify Live Preview hides anchors, Source shows them, and Smart Reference
 clicks still navigate/highlight. If needed enable SMART_REFERENCE_DEBUG and capture
 token/decoration counts. Existing three untracked files remain untouched.
+
+
+## Backlinks-only clarification and workspace attachment
+
+User corrected the scope: the visible metadata is in Backlinks (“链接当前文件”),
+not Live Preview. Preserve 95ee7b9's CM6 changes unchanged. Existing tests already
+hide the supplied literal examples under the known selectors; the remaining Vault
+failure has not been reproduced from the available information. Requested affected
+row outerHTML/window location to distinguish missing observer scope from rendering.
+
+Addressed a concrete attachment limitation: setup previously observed only the
+original main document.body. A Backlinks-only manager now attaches above each
+workspace document's body, refreshes on file-open/active-leaf/layout changes, and
+attaches/detaches on window-open/close. DOM observers still cover delayed renders.
+The cleanup matcher is unchanged. Debug output includes matchedBacklinkRows,
+hiddenMarkerCount, panesFound and rootConnected; no editor/navigation changes.
+
+64 tests, typecheck, build and diff check pass. New regression covers secondary
+documents, body replacement, explicit workspace refresh, detach and unload; prior
+rerender/click/Source/CM6 tests pass. Real-Vault resolution remains unconfirmed.
+Next: reload and inspect Backlinks after opening/clicking/switching files. If markers
+remain, collect the affected row outerHTML and debug counts; do not infer another
+editor defect. Pre-existing untracked investigation files remain untouched.

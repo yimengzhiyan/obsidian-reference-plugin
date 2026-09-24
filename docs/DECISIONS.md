@@ -915,3 +915,15 @@ Source clears all concealment. Existing marker-comment replacements stay intact.
 This supersedes D-045's base-theme-only anchor treatment, without changing Backlinks
 or Reading View. Pattern ownership is inferred: manually authored sr- IDs matching
 the reserved format also hide in Live Preview. Runtime validation remains required.
+
+
+## D-050 — Bind Backlinks cleanup to workspace documents and events
+
+Keep the existing Backlinks matcher and CM6/editor extensions unchanged. Manage
+one scoped observer per workspace document on documentElement instead of the
+initial main body, so body replacement and secondary windows remain covered.
+Refresh explicitly on file-open, active-leaf-change and layout-change in addition
+to DOM observation; attach/detach on window events and restore wrappers on unload.
+These are display lifecycle hooks only; no navigation or file mutation hooks are
+introduced. This addresses attachment coverage, not a proven reproduction of the
+latest Vault failure; retain diagnostic counts and request DOM evidence if it persists.

@@ -776,3 +776,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Actual CM6 DOM fixture tests: concealment, normal IDs, Source and exact marks
 - [x] 63 tests, typecheck, build and diff check pass
 - [ ] Real Obsidian: Live Preview hidden, Source raw, clicks navigate/exact-highlight
+
+
+## Backlinks-only clarification after CM6 work
+
+- [x] Preserve prior CM6 code; current user report concerns Backlinks only
+- [x] Cover workspace documents, body replacement and file/view/layout refreshes
+- [x] Debug matched Backlinks rows, marker count, pane count and root connection
+- [x] 64 tests, typecheck, build and diff check pass
+- [ ] Confirm latest reported Vault failure is resolved after reload
+- [ ] If unresolved, inspect requested outerHTML and counts before further fixes
