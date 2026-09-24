@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 61 passed
+- npm test: 63 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -169,3 +169,27 @@ until unload, and verify no self-generated cleanup loop. Real Vault validation
 remains: open/switch notes, click backlinks repeatedly, refresh pane, verify hidden
 markers and unchanged navigation/highlighting. Private DOM and main-document
 limitations remain. Existing three untracked investigation files remain untouched.
+
+
+## Live Preview block-token repair (current task)
+
+User clarified that Reading View and Backlinks issues are solved. The remaining
+issue is Live Preview cm-blockid spans showing generated anchors. No changes to
+Backlinks, Reading View, click interception, navigation, or highlight code here.
+
+Broaden Live Preview's reserved format from eight hex digits to ^sr-[a-z0-9]+.
+Mark decorations now carry inline display:none!important instead of relying on a
+base theme. A CM6 ViewPlugin measures actual cm-blockid spans after rendering,
+validates posAtDOM against current source, and adds missing decoration ranges via
+a StateEffect. Dispatch runs in a microtask after CM's measure phase, with state,
+mode and disposal guards. Source mode clears concealment; no editor DOM mutation.
+Debug-only logs report matchedCmBlockidTokens, hiddenDecorationCount and pending
+counts. Ordinary user IDs outside the reserved format remain visible.
+
+63 tests, typecheck/build and diff check pass. Added actual CM6 EditorView/jsdom
+coverage with cm-blockid decorations, Source toggling and exact-highlight marks;
+token mapping tests reject stale/unmappable or non-reserved tokens. Existing refId
+and locator tests remain green. This is not a real Obsidian UI run. Next: install
+the build, verify Live Preview hides anchors, Source shows them, and Smart Reference
+clicks still navigate/highlight. If needed enable SMART_REFERENCE_DEBUG and capture
+token/decoration counts. Existing three untracked files remain untouched.

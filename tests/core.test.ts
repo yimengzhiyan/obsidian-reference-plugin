@@ -1,6 +1,7 @@
+import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
 import { concealBacklinkMatch, startBacklinksCleanup } from "../src/backlinks-cleanup.ts";
-import { createMetadataHidingField } from "../src/metadata-hiding.ts";
+import { createMetadataHidingField, renderedBlockTokenRanges } from "../src/metadata-hiding.ts";
 import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
@@ -609,12 +610,12 @@ test("Live Preview conceals only generated block anchors and Source retains them
   const original = state.doc.toString();
   const hidden: string[] = [];
   state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
-  assert.deepEqual(hidden, ["^sr-9134bc06", "^sr-f3f81c62"]);
+  assert.deepEqual(hidden, ["^sr-9134bc06", "^sr-f3f81c62", "^sr-short", "^sr-9134bc060"]);
   state = state.update({ effects: setTestLivePreview.of(false) }).state;
   assert.equal(state.field(hiding).size, 0);
   assert.equal(state.doc.toString(), original);
   state = state.update({ effects: setTestLivePreview.of(true) }).state;
-  assert.equal(state.field(hiding).size, 2);
+  assert.equal(state.field(hiding).size, 4);
 });
 
 test("concealed anchors remain available for reference navigation and exact decoration", () => {
@@ -836,4 +837,74 @@ test("Backlinks persistent observer repairs refreshed wrapper visibility without
   assert.equal(pane.querySelector('.smart-ref-hidden-backlink-metadata'), currentWrapper,
     'our own wrappers must not cause a repeated cleanup loop');
   stop();
+});
+
+test("Live Preview maps only reserved cm-blockid syntax tokens to current source", () => {
+  const { document } = parseHTML('<html><body><span class="cm-blockid">^sr-fa1b9d4b</span><span class="cm-blockid">^sr-az09</span><span class="cm-blockid">^user-id</span><span class="cm-blockid">^sr-Upper</span><span class="cm-blockid">^sr-a-b</span><span>^sr-notatoken</span></body></html>');
+  const source = Array.from(document.body.children).map((node) => node.textContent).join('\n');
+  const state = EditorState.create({ doc: source });
+  const bridge = {
+    contentDOM: document.body,
+    state,
+    posAtDOM: (node: Node) => source.indexOf(node.textContent!),
+  };
+  assert.deepEqual(renderedBlockTokenRanges(bridge).map((range) => range.text), ['^sr-fa1b9d4b', '^sr-az09']);
+  assert.deepEqual(renderedBlockTokenRanges({ ...bridge, posAtDOM: () => 9999 }), []);
+  assert.deepEqual(renderedBlockTokenRanges({ ...bridge, posAtDOM: () => { throw new Error('stale token'); } }), []);
+});
+
+test("CM6 renders hidden block-token decorations and reveals Source without losing exact marks", async () => {
+  const dom = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
+  const globals = ['window', 'document', 'MutationObserver', 'Window', 'HTMLElement', 'Node', 'getComputedStyle'];
+  const saved = globals.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+  for (const name of globals) Object.defineProperty(globalThis, name, {
+    value: Reflect.get(dom.window, name), configurable: true, writable: true,
+  });
+  // jsdom has no layout engine; CM only needs empty rectangles for this fixture.
+  dom.window.Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+  dom.window.Range.prototype.getBoundingClientRect = () => new dom.window.DOMRect();
+  const source = 'chosen words ^sr-az09 suffix\nNormal ^user-id';
+  const anchorFrom = source.indexOf('^sr-');
+  const userFrom = source.indexOf('^user-');
+  const errors: unknown[] = [];
+  let view: EditorView | undefined;
+  try {
+    const hiding = createMetadataHidingField(testLivePreviewField);
+    view = new EditorView({ parent: dom.window.document.body, state: EditorState.create({
+      doc: source,
+      extensions: [testLivePreviewField, hiding, preciseHighlightField,
+        EditorView.exceptionSink.of((error) => errors.push(error)),
+        EditorView.decorations.of(Decoration.set([
+          Decoration.mark({ class: 'cm-blockid' }).range(anchorFrom, anchorFrom + 8),
+          Decoration.mark({ class: 'cm-blockid' }).range(userFrom, source.length),
+        ])),
+      ],
+    }) });
+    // The fixture's token is not line-ending: only the rendered-token bridge hides it.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.deepEqual(errors, []);
+    assert.equal(view.state.field(hiding).size, 1);
+    const hidden = view.contentDOM.querySelector<HTMLElement>('.smart-ref-hidden-block-id')!;
+    assert.equal(hidden.textContent, '^sr-az09');
+    assert.equal(dom.window.getComputedStyle(hidden).display, 'none');
+    assert.equal(view.contentDOM.querySelectorAll('.cm-blockid').length, 2);
+    const userToken = Array.from(view.contentDOM.querySelectorAll('.cm-blockid')).find((node) => node.textContent === '^user-id')!;
+    assert.equal(userToken.closest('.smart-ref-hidden-block-id'), null);
+    assert.equal(userToken.querySelector('.smart-ref-hidden-block-id'), null);
+    view.dispatch({ effects: setPreciseHighlight.of({ from: 0, to: 12 }) });
+    assert.equal(view.contentDOM.querySelector('.smart-ref-precise-highlight')?.textContent, 'chosen words');
+    view.dispatch({ effects: setTestLivePreview.of(false) });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(view.contentDOM.querySelector('.smart-ref-hidden-block-id'), null);
+    assert.equal(view.contentDOM.textContent, source.replace('\n', ''));
+    assert.equal(view.state.doc.toString(), source);
+    assert.deepEqual(errors, []);
+  } finally {
+    view?.destroy();
+    dom.window.close();
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
 });

@@ -765,3 +765,14 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] 61 tests, typecheck, build and diff check pass
 - [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
+
+
+## Live Preview block-token-only follow-up
+
+- [x] User clarified Reading View and Backlinks are solved; leave them unchanged
+- [x] Match reserved ^sr-[a-z0-9]+ IDs with inline-styled CM6 mark decorations
+- [x] Measure actual cm-blockid tokens and supplement missing source ranges safely
+- [x] Debug matched tokens and applied/pending decoration counts
+- [x] Actual CM6 DOM fixture tests: concealment, normal IDs, Source and exact marks
+- [x] 63 tests, typecheck, build and diff check pass
+- [ ] Real Obsidian: Live Preview hidden, Source raw, clicks navigate/exact-highlight

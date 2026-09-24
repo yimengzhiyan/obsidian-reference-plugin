@@ -40,7 +40,7 @@ four-level reference UI is not implemented.
 ```
 
 The adjacent HTML comment is invisible in Reading View. Live Preview hides both
-HTML markers, legacy `%%ref:id%%` markers, and generated `^sr-xxxxxxxx` block
+HTML markers, legacy `%%ref:id%%` markers, and reserved `^sr-[a-z0-9]+` block
 anchors using editor decorations; Source mode
 keeps raw Markdown visible. Alias edits do not change
 reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
@@ -82,8 +82,11 @@ Native clicks are canceled only after those checks pass.
 
 A separate StateField hides complete Smart Reference markers with replacement
 decorations and generated line-ending block anchors with styled mark decorations.
-The marks conceal Obsidian `cm-blockid` tokens without hiding ordinary block IDs.
-Both apply only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
+The marks carry an inline hiding style. A CM6 view extension also reads rendered
+`cm-blockid` tokens after rendering, validates their current source positions, and
+adds missing marks for the reserved `^sr-[a-z0-9]+` format. It never mutates CM DOM.
+Ordinary IDs remain visible; manually authored IDs using the reserved format are
+indistinguishable from generated ones. Both strategies apply only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
 on document or mode changes and provides atomic cursor ranges. It never changes
 Markdown or source offsets. Ordinary comments and pending-creation placeholders
 remain untouched. Switch to Source mode to inspect/edit raw markers.

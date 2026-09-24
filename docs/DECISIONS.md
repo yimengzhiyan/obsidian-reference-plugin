@@ -902,3 +902,16 @@ from synchronous plugin cleanup to prevent feedback; do not disconnect/reconnect
 per cleanup. Unload is the only disconnect and restores wrappers. This prioritizes
 rerender correctness; scanning current Backlinks rows per mutation batch may cost
 more with large panels. Runtime Obsidian revalidation is still required.
+
+
+## D-049 — Resolve Live Preview block syntax tokens through CM6
+
+For Live Preview only, accept the requested reserved ^sr-[a-z0-9]+ anchor format.
+Use inline-styled mark decorations and a ViewPlugin that reads cm-blockid tokens,
+validates source offsets through posAtDOM, and supplements source-discovered marks.
+Schedule measurements after rendering; dispatch missing marks after CM's measure
+phase with stale-state/mode/unload guards. Never directly mutate CM-owned DOM.
+Source clears all concealment. Existing marker-comment replacements stay intact.
+This supersedes D-045's base-theme-only anchor treatment, without changing Backlinks
+or Reading View. Pattern ownership is inferred: manually authored sr- IDs matching
+the reserved format also hide in Live Preview. Runtime validation remains required.
