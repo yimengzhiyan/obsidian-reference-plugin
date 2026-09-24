@@ -789,7 +789,7 @@ test("Backlinks pane observers handle opening, delayed text, note switches and r
   assert.equal(replacement.textContent, 'Replacement %%ref:three%%');
 });
 
-test("Backlinks observer stays connected across click rerenders and later refreshes", async () => {
+test("Backlinks observer reattaches on click replacement and stays connected during refreshes", async () => {
   const { document, window } = backlinksFixture();
   const NativeObserver = window.MutationObserver;
   let disconnects = 0;
@@ -814,9 +814,9 @@ test("Backlinks observer stays connected across click rerenders and later refres
     await tick();
     assert.equal(visibleSnippetText(pane), `Refresh ${i} `);
   }
-  assert.equal(disconnects, 0, 'render cleanup must never disconnect observation');
+  assert.equal(disconnects, 1, 'disconnect only the replaced pane, not during content cleanup');
   stop();
-  assert.equal(disconnects, 1);
+  assert.equal(disconnects, 3); // replaced pane, current pane, and discovery observer
   assert.equal(pane.textContent, 'Refresh 2 <!--smart-ref:refresh-2-->');
 });
 
@@ -939,4 +939,40 @@ test("Backlinks workspace manager covers rebuilt bodies and secondary documents"
   assert.equal(main.document.querySelector('.smart-ref-hidden-backlink-metadata'), null);
   main.window.close();
   secondary.window.close();
+});
+
+test("workspace refresh rebinds observers to new pane identities before and after delayed recreation", async () => {
+  const { document, window } = backlinksFixture();
+  const NativeObserver = window.MutationObserver;
+  const attached = new Map<MutationObserver, Node>();
+  window.MutationObserver = class extends NativeObserver {
+    override observe(target: Node, options: MutationObserverInit) {
+      attached.set(this, target);
+      super.observe(target, options);
+    }
+    override disconnect() { attached.delete(this); super.disconnect(); }
+  };
+  const manager = createBacklinksCleanupManager();
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  manager.attach(document);
+  let previous = document.querySelector('.backlink-pane')!;
+  assert.ok([...attached.values()].includes(previous));
+  for (const event of ['file-open', 'active-leaf-change', 'layout-change']) {
+    previous.remove();
+    manager.refresh(event); // Workspace notification can precede asynchronous rendering.
+    assert.ok(![...attached.values()].includes(previous));
+    const next = document.createElement('div');
+    next.className = 'backlink-pane';
+    next.innerHTML = `<div class="search-result-file-match">${event} %%ref:new%%</div>`;
+    document.body.append(next);
+    await tick();
+    assert.ok([...attached.values()].includes(next));
+    assert.equal(visibleSnippetText(next), `${event} `);
+    manager.refresh(event); // Repeated event must not attach another observer.
+    assert.equal([...attached.values()].filter((target) => target === next).length, 1);
+    previous = next;
+  }
+  manager.destroy();
+  assert.equal(attached.size, 0);
+  window.close();
 });

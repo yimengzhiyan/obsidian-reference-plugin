@@ -927,3 +927,15 @@ to DOM observation; attach/detach on window events and restore wrappers on unloa
 These are display lifecycle hooks only; no navigation or file mutation hooks are
 introduced. This addresses attachment coverage, not a proven reproduction of the
 latest Vault failure; retain diagnostic counts and request DOM evidence if it persists.
+
+
+## D-051 — Reconcile actual Backlinks pane identities on workspace refresh
+
+Refine D-050's document lifecycle: keep stable discovery observation per document,
+but attach content observers directly to current .backlink-pane elements. Reconcile
+pane identity on named workspace events and discovery mutations; disconnect removed
+panes, attach replacements once, and clean existing panes on workspace refresh.
+Discovery handles rendering after the event without timeouts. Separate discovery
+from content cleanup so plugin writes do not repeatedly reclean unchanged panes.
+Retain the existing concealment function byte-for-byte. Debug target elements and
+event names make lifecycle verification possible in the real Vault.

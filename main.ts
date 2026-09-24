@@ -50,18 +50,18 @@ export default class ReferencePlugin extends Plugin {
     this.registerEditorExtension(preciseHighlightField);
     this.registerEditorExtension(createMetadataHidingField(editorLivePreviewField));
     const backlinks = createBacklinksCleanupManager();
-    const refreshBacklinks = () => {
+    const refreshBacklinks = (event: string) => {
       backlinks.attach(document);
       this.app.workspace.iterateAllLeaves((leaf) => backlinks.attach(leaf.view.containerEl.ownerDocument));
-      backlinks.refresh();
+      backlinks.refresh(event);
     };
     this.register(() => backlinks.destroy());
-    this.registerEvent(this.app.workspace.on("file-open", refreshBacklinks));
-    this.registerEvent(this.app.workspace.on("layout-change", refreshBacklinks));
-    this.registerEvent(this.app.workspace.on("active-leaf-change", refreshBacklinks));
+    this.registerEvent(this.app.workspace.on("file-open", () => refreshBacklinks("file-open")));
+    this.registerEvent(this.app.workspace.on("layout-change", () => refreshBacklinks("layout-change")));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => refreshBacklinks("active-leaf-change")));
     this.registerEvent(this.app.workspace.on("window-open", (_win, opened) => backlinks.attach(opened.document)));
     this.registerEvent(this.app.workspace.on("window-close", (_win, closed) => backlinks.detach(closed.document)));
-    refreshBacklinks();
+    refreshBacklinks("plugin-load");
     this.registerDomEvent(document, "keydown", (event) => void this.handleSelectionKey(event), {
       capture: true,
     });

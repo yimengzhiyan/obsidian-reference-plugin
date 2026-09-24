@@ -49,59 +49,75 @@ export function concealBacklinkMatch(snippet: Element): number {
   return count;
 }
 
-/** Keep observing the stable UI root while Obsidian replaces panes and results. */
-export type BacklinksCleanup = (() => void) & { refresh(): void };
+export type BacklinksCleanup = (() => void) & { refresh(reason?: string): void };
 
+/** A stable discovery observer owns one cleanup observer per current pane element. */
 export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   const Observer = root.ownerDocument.defaultView!.MutationObserver;
+  const panes = new Map<Element, BacklinksCleanup>();
   let stopped = false;
-  let panes = new Set<Element>();
-  const clean = (reason: string): void => {
-    if (stopped) return;
-    const currentPanes = new Set(root.querySelectorAll(PANE));
-    if (root.matches(PANE)) currentPanes.add(root);
-    for (const pane of panes) {
-      if (!currentPanes.has(pane)) reveal(pane);
-    }
-    panes = currentPanes;
-    const rows = new Set<Element>();
-    for (const pane of panes) pane.querySelectorAll(MATCH).forEach((row) => rows.add(row));
-    let markersHidden = 0;
-    for (const row of rows) {
-      // Reconcile the current DOM, not cached row identities from before navigation.
-      reveal(row);
-      markersHidden += concealBacklinkMatch(row);
-    }
-    debugLog(() => ["[Smart Reference] Backlinks cleanup", {
-      reason, panesFound: panes.size, matchedBacklinkRows: rows.size, hiddenMarkerCount: markersHidden,
-      rootConnected: root.isConnected,
-    }]);
-    // All writes above are synchronous. Discard only the records produced by this
-    // cleanup; remain subscribed to subsequent renders, including other observers.
-    observer.takeRecords();
+  const attachPane = (pane: Element, reason: string): BacklinksCleanup => {
+    let disposed = false;
+    const clean = (trigger = "pane-mutation") => {
+      if (disposed || stopped || !root.contains(pane)) return;
+      const rows = Array.from(pane.querySelectorAll(MATCH))
+        .filter((row) => row.closest(PANE) === pane);
+      let hiddenMarkerCount = 0;
+      for (const row of rows) {
+        reveal(row);
+        hiddenMarkerCount += concealBacklinkMatch(row);
+      }
+      observer.takeRecords();
+      debugLog(() => ["[Smart Reference] Backlinks cleanup", {
+        reason: trigger, target: pane, matchedBacklinkRows: rows.length, hiddenMarkerCount,
+      }]);
+    };
+    const observer = new Observer(() => clean());
+    observer.observe(pane, {
+      childList: true, subtree: true, characterData: true,
+      attributes: true, attributeFilter: ["class", "hidden", "style"],
+    });
+    debugLog(() => ["[Smart Reference] Backlinks observer attached", { target: pane, reason }]);
+    clean(reason);
+    const stop = () => {
+      if (disposed) return;
+      disposed = true;
+      observer.disconnect();
+      reveal(pane);
+      debugLog(() => ["[Smart Reference] Backlinks observer disconnected", { target: pane }]);
+    };
+    return Object.assign(stop, { refresh: clean });
   };
-  const observer = new Observer((records) => {
+  const reconcile = (reason: string, refreshExisting: boolean) => {
     if (stopped) return;
-    debugLog(() => ["[Smart Reference] Backlinks observer triggered", {
-      mutationCount: records.length,
-    }]);
-    // A refresh may rebuild any ancestor of a row. Re-read the current panes rather
-    // than guessing affected rows from the old nodes in the mutation records.
-    clean("render-mutation");
-  });
-  observer.observe(root, {
-    childList: true, subtree: true, characterData: true,
-    attributes: true, attributeFilter: ["class", "hidden", "style"],
-  });
-  clean("initial-render");
+    const current = new Set(root.querySelectorAll(PANE));
+    if (root.matches(PANE)) current.add(root);
+    for (const [pane, cleanup] of panes) {
+      if (!current.has(pane)) {
+        cleanup();
+        panes.delete(pane);
+      }
+    }
+    for (const pane of current) {
+      const existing = panes.get(pane);
+      if (!existing) panes.set(pane, attachPane(pane, reason));
+      else if (refreshExisting) existing.refresh(reason);
+    }
+    // Discovery never reapplies cleanup to unchanged panes for plugin-generated
+    // mutations. Their own observers handle content; this avoids feedback loops.
+    discovery.takeRecords();
+  };
+  const discovery = new Observer(() => reconcile("pane-dom-recreated", false));
+  discovery.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+  reconcile("initial-render", true);
   const stop = () => {
+    if (stopped) return;
     stopped = true;
-    observer.disconnect();
-    for (const pane of panes) reveal(pane);
-    reveal(root);
+    discovery.disconnect();
+    for (const cleanup of panes.values()) cleanup();
     panes.clear();
   };
-  return Object.assign(stop, { refresh: () => clean("workspace-refresh") });
+  return Object.assign(stop, { refresh: (reason = "workspace-refresh") => reconcile(reason, true) });
 }
 
 
@@ -123,9 +139,10 @@ export function createBacklinksCleanupManager() {
       documents.set(doc, { root, cleanup: startBacklinksCleanup(root) });
     },
     detach,
-    refresh(): void {
+    refresh(reason = "workspace-refresh"): void {
       if (stopped) return;
-      for (const { cleanup } of documents.values()) cleanup.refresh();
+      debugLog(() => ["[Smart Reference] Backlinks workspace refresh", { event: reason }]);
+      for (const { cleanup } of documents.values()) cleanup.refresh(reason);
     },
     destroy(): void {
       stopped = true;

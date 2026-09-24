@@ -108,19 +108,20 @@ and generated `^sr-xxxxxxxx` text tokens within `.backlink-pane
 `.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
 textContent, link elements, href attributes and native handlers; no Markdown or
 metadata is rewritten. Split tokens and delayed text updates are supported.
-Each workspace document has an observer above its body. File-open, active-view and
-layout events explicitly refresh cleanup; window events attach/remove document
-observers. Each render mutation batch rescans current Backlinks rows, including newly inserted
-panes and results after navigation. The observer stays connected during cleanup;
-its synchronous mutation records are drained to prevent feedback loops. Plugin
-unload disconnects it and removes wrappers; Source and Live Preview are unchanged.
+Each workspace document has a discovery observer above its body and one cleanup
+observer attached to each current `.backlink-pane`. File-open, active-view and
+layout events reconcile actual pane identities: removed panes are disconnected,
+new panes are observed and cleaned immediately. Discovery also handles panes that
+arrive after the workspace event. Content observers remain connected during cleanup;
+plugin-generated mutations do not trigger a cleanup loop. Unload disconnects all
+observers and removes wrappers; Source and Live Preview are unchanged.
 
 This depends on private Obsidian Backlinks DOM. The confirmed hierarchy is
 `.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
 `.search-result-file-matched-text`. Other layouts, global search and truncated markers
 are not covered. Workspace pop-out documents use the same scoped cleanup. Debug logging reports cleanup
-trigger/mutation count, cleanup reason, `matchedBacklinkRows`, `panesFound`, `rootConnected`, and
-`hiddenMarkerCount` (complete tokens, not wrapper spans), including zero-match runs.
+workspace event names, actual observer attachment/disconnection targets,
+`matchedBacklinkRows`, and `hiddenMarkerCount` (complete tokens, not wrapper spans), including zero-match runs.
 Real Vault validation remains pending for this repair.
 
 Future appearance, hover/focus and settings ideas are in

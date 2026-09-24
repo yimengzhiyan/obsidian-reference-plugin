@@ -786,3 +786,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] 64 tests, typecheck, build and diff check pass
 - [ ] Confirm latest reported Vault failure is resolved after reload
 - [ ] If unresolved, inspect requested outerHTML and counts before further fixes
+
+
+## Backlinks pane recreation after file switching
+
+- [x] Preserve marker regex/cleanup function and all editor/navigation behavior
+- [x] Track current pane identities; disconnect removed panes and attach replacements
+- [x] Handle delayed recreation after file-open/active-leaf-change/layout-change
+- [x] Debug target attach/disconnect, workspace event and hidden marker count
+- [x] 65 tests, typecheck/build/diff check; observer-target assertions cover all events
+- [ ] Real Vault: switching files/leaf/layout keeps markers hidden and links working

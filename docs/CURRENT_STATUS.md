@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 64 passed
+- npm test: 65 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -216,3 +216,25 @@ rerender/click/Source/CM6 tests pass. Real-Vault resolution remains unconfirmed.
 Next: reload and inspect Backlinks after opening/clicking/switching files. If markers
 remain, collect the affected row outerHTML and debug counts; do not infer another
 editor defect. Pre-existing untracked investigation files remain untouched.
+
+
+## Current Backlinks pane-identity lifecycle repair
+
+User confirmed cleanup works initially but markers reappear after file switching.
+Keep all marker matching/concealment code unchanged. Each document now maintains
+a discovery observer and a registry keyed by actual .backlink-pane elements, with
+one content observer per current pane. Workspace refresh reconciles live identities,
+disconnects stale panes, attaches/cleans replacements and refreshes retained panes.
+Discovery catches asynchronous replacements that arrive after the event. Content
+cleanup drains its synchronous records without disconnecting its pane observer.
+
+file-open, active-leaf-change and layout-change now pass their names into diagnostics.
+Debug logs show workspace event, attached target element, disconnected target,
+matched row count and hidden marker count. No CM6, Reading View, navigation,
+highlighting, storage or marker regex changes.
+
+65 tests, typecheck/build and diff check pass. Instrumented observer tests confirm
+stale-target disconnection and exactly one observer on each new pane after all three
+workspace events, including delayed recreation and unload. Real Obsidian validation
+remains: switch files/activate leaves/change layout and confirm marker concealment
+and navigation. Existing three untracked investigation files remain untouched.
