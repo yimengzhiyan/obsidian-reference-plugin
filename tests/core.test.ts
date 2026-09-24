@@ -1,3 +1,6 @@
+import { EditorState, StateEffect, Text } from "@codemirror/state";
+import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
+import { toEditorHighlightRange } from "../src/editor-range.ts";
 import { findRenderedBlockIndex, sourceBlockMarkdown } from "../src/reading-container.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -427,4 +430,48 @@ test("Reading click reuses annotation's resolved path and block identity", () =>
   const resolver = (path: string) => path === "Target" ? "Folder/Target" : path;
   assert.equal(resolveReadingClickReference(source, [{ target: "Target#%5Eblock" }], 0, resolver), "id");
   assert.equal(resolveReadingClickReference(source, [{ target: "Target#^different" }], 0, resolver), null);
+});
+
+
+test("editor range converts Obsidian positions into CodeMirror offsets", () => {
+  const source = "Header\r\nPrefix chosen words suffix";
+  const doc = Text.of(source.split("\r\n"));
+  const offsetToPos = (offset: number) => {
+    const lines = source.slice(0, offset).split("\r\n");
+    return { line: lines.length - 1, ch: lines.at(-1)!.length };
+  };
+  const from = source.indexOf("chosen");
+  assert.deepEqual(toEditorHighlightRange({ from, to: from + 12 }, source.length, offsetToPos, doc), { from: from - 1, to: from + 11 });
+  assert.equal(toEditorHighlightRange({ from: -1, to: 2 }, source.length, offsetToPos, doc), null);
+  assert.equal(toEditorHighlightRange({ from: 1, to: source.length + 1 }, source.length, offsetToPos, doc), null);
+});
+
+test("editor decoration marks recovered exact text and clears without modifying source", () => {
+  const source = "Inserted. Prefix chosen words suffix ^block-1";
+  const location = locateReference(source, makeReference({}));
+  assert.equal(location.kind, "exact");
+  let state = EditorState.create({ doc: source });
+  const range = toEditorHighlightRange(location.range, source.length, (offset) => {
+    const line = state.doc.lineAt(offset);
+    return { line: line.number - 1, ch: offset - line.from };
+  }, state.doc)!;
+  state = state.update({ effects: [StateEffect.appendConfig.of(preciseHighlightField), setPreciseHighlight.of(range)] }).state;
+  const marked: string[] = [];
+  state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { marked.push(state.doc.sliceString(from, to)); });
+  assert.deepEqual(marked, ["chosen words"]);
+  state = state.update({ effects: setPreciseHighlight.of(null) }).state;
+  assert.equal(state.field(preciseHighlightField).size, 0);
+  assert.equal(state.doc.toString(), source);
+});
+
+test("editor block fallback uses the locator range and decorations follow edits", () => {
+  const source = "Prefix replacement suffix ^block-1";
+  const location = locateReference(source, makeReference({}));
+  assert.equal(location.kind, "block-only");
+  let state = EditorState.create({ doc: source, extensions: [preciseHighlightField] });
+  state = state.update({ effects: setPreciseHighlight.of(location.range) }).state;
+  state = state.update({ changes: { from: 0, insert: "New " } }).state;
+  const ranges: Array<{ from: number; to: number }> = [];
+  state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { ranges.push({ from, to }); });
+  assert.deepEqual(ranges, [{ from: 4, to: source.length + 4 }]);
 });

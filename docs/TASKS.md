@@ -658,3 +658,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Six pure association tests and full tests/typecheck/build/diff checks
 - [ ] Real Obsidian: unannotated click, alias/source edits, ordinary/ambiguous links
 - [ ] Confirm enhanced navigation before evaluating target exact-highlight logs
+
+
+## Editor exact highlighting
+
+- [x] Reading View exact highlight confirmed in real Obsidian
+- [x] Preserve Reading View DOM Range implementation
+- [x] Convert recovered offsets through editor positions to CM6 mark ranges
+- [x] Verify decoration application and log mode/path/range/result
+- [x] CM6 tests for exact recovery, cleanup, fallback, and mapped edits
+- [ ] Real Obsidian: Live Preview and Source targets, alias/source edits, cleanup

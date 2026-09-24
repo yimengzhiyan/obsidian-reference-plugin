@@ -792,3 +792,14 @@ Count mismatches remain native; unique source/rendered target pairs are safe.
 Do not wait for annotation or cancel native clicks until refId, metadata and target
 are validated. Log the actual association path. This change does not modify target
 highlighting, and the observed native block effect is not evidence of its failure.
+
+
+## D-040 — Editor highlights convert recovered offsets and verify CM6 marks
+
+Reading View exact highlighting is runtime-validated and its DOM Range code is
+unchanged. Editor targets use current editor text for the existing locator, then
+convert recovered offsets via Obsidian offsetToPos to CodeMirror document positions.
+Stored offsets are never blindly reapplied after locator recovery. Reuse the
+registered decoration field, installing it in the current state if absent, and
+verify the resulting mark before reporting success. Preserve block fallback and
+cleanup. Both Live Preview and Source share this editor strategy.

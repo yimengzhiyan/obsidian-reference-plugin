@@ -1,10 +1,12 @@
 import { Component, Editor, MarkdownRenderer, MarkdownView, Notice, TFile, type App } from "obsidian";
 import { EditorView } from "@codemirror/view";
+import { StateEffect } from "@codemirror/state";
+import { toEditorHighlightRange } from "./editor-range.ts";
 import { findBlockById } from "./blocks.ts";
 import { findRenderedBlockIndex, sourceBlockMarkdown } from "./reading-container.ts";
 import { locateReference, type LocateResult } from "./locator.ts";
 import type { PreciseReference } from "./model.ts";
-import { setPreciseHighlight } from "./highlight.ts";
+import { preciseHighlightField, setPreciseHighlight } from "./highlight.ts";
 import { findRenderedTextRange, mapTextRangeToSegments } from "./rendered-text.ts";
 import { classifyHighlightResult, type NavigationResult } from "./navigation-result.ts";
 
@@ -31,12 +33,14 @@ export class SmartReferenceNavigator {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view || view.file?.path !== file.path) return "unsupported-view";
 
-    const location = locateReference(view.getViewData(), reference);
+    const mode = view.getMode();
+    console.debug("[Smart Reference] target view", { mode, targetPath: file.path });
+    const location = locateReference(mode === "source" ? view.editor.getValue() : view.getViewData(), reference);
     console.debug("[Smart Reference] target locator", { refId: reference.refId, kind: location.kind });
     if (location.kind === "missing-block") return "missing-block";
 
     this.cancelHighlight();
-    const applied = view.getMode() === "preview"
+    const applied = mode === "preview"
       ? await highlightReadingView(this.app, view, reference, location)
       : highlightEditingView(view, location);
     if (!applied) return "unsupported-view";
@@ -86,18 +90,47 @@ export function showNavigationResult(result: NavigationResult): void {
 }
 
 function highlightEditingView(view: MarkdownView, location: Exclude<LocateResult, { kind: "missing-block" }>): AppliedHighlight | null {
+  const mode = view.getMode();
+  const targetPath = view.file?.path ?? null;
+  const report = (range: { from: number; to: number } | null, success: boolean, reason: string | null) =>
+    console.debug("[Smart Reference] Editor highlight", {
+      mode, targetPath, from: range?.from ?? null, to: range?.to ?? null,
+      locatorKind: location.kind, success, decorationApplied: success, reason,
+    });
   const cm = getCodeMirrorView(view.editor);
-  if (!cm) return null;
-  cm.dispatch({
-    effects: [
-      setPreciseHighlight.of(location.range),
-      EditorView.scrollIntoView(location.range.from, { y: "center" }),
-    ],
-  });
-  return {
-    kind: location.kind === "exact" ? "exact" : "block",
-    cleanup: () => cm.dispatch({ effects: setPreciseHighlight.of(null) }),
-  };
+  if (!cm) {
+    report(null, false, "codemirror-view-unavailable");
+    return null;
+  }
+  const range = toEditorHighlightRange(location.range, view.editor.getValue().length,
+    (offset) => view.editor.offsetToPos(offset), cm.state.doc);
+  if (!range) {
+    report(null, false, "invalid-editor-range");
+    return null;
+  }
+  try {
+    const effects: StateEffect<unknown>[] = [];
+    if (!cm.state.field(preciseHighlightField, false)) {
+      effects.push(StateEffect.appendConfig.of(preciseHighlightField));
+    }
+    effects.push(setPreciseHighlight.of(range), EditorView.scrollIntoView(range.from, { y: "center" }));
+    cm.dispatch({ effects });
+    const decorations = cm.state.field(preciseHighlightField, false);
+    let applied = false;
+    decorations?.between(range.from, range.to, (from, to) => {
+      if (from === range.from && to === range.to) applied = true;
+    });
+    report(range, applied, applied ? null : "decoration-not-applied");
+    if (!applied) return null;
+    return {
+      kind: location.kind === "exact" ? "exact" : "block",
+      cleanup: () => cm.dispatch({ effects: setPreciseHighlight.of(null) }),
+    };
+  } catch (error) {
+    report(range, false, "decoration-dispatch-failed");
+    console.debug("[Smart Reference] Editor highlight exception", { targetPath, error });
+    return null;
+  }
 }
 
 async function highlightReadingView(
