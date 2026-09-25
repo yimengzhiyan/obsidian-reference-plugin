@@ -139,33 +139,70 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   const panes = new Map<Element, BacklinksCleanup>();
   let stopped = false;
   const attachPane = (pane: Element, reason: string): BacklinksCleanup => {
+    const view = pane.ownerDocument.defaultView!;
     let disposed = false;
-    let pendingCleanup: number | null = null;
+    let cleanupRuns = 0;
     let pendingReason = "pane-mutation";
+    type FrameHandle = { id: number; kind: "animation-frame" | "timeout" };
+    let pendingFrame: FrameHandle | null = null;
+    let pendingSettledFrame: FrameHandle | null = null;
     const processedRows = new WeakMap<Element, string>();
+    const requestFrame = (callback: () => void): FrameHandle => typeof view.requestAnimationFrame === "function"
+      ? { id: view.requestAnimationFrame(() => callback()), kind: "animation-frame" }
+      : { id: view.setTimeout(callback, 0), kind: "timeout" };
+    const cancelFrame = (handle: FrameHandle | null) => {
+      if (!handle) return;
+      if (handle.kind === "animation-frame") view.cancelAnimationFrame(handle.id);
+      else view.clearTimeout(handle.id);
+    };
     const clean = (trigger = "pane-mutation") => {
       if (disposed || stopped || !root.contains(pane)) return;
+      cleanupRuns += 1;
       const rows = Array.from(pane.querySelectorAll(MATCH))
         .filter((row) => row.closest(PANE) === pane);
       let hiddenMarkerCount = 0;
+      let matchedElements = 0;
+      let replacements = 0;
+      let skippedAlreadyProcessedNodes = 0;
       for (const row of rows) {
-        if (processedRows.get(row) === row.innerHTML) continue;
+        const matchedTextSpans = Array.from(row.querySelectorAll(MATCHED_TEXT))
+          .filter((span) => span.closest(MATCH) === row);
+        matchedElements += matchedTextSpans.length;
+        if (processedRows.get(row) === row.innerHTML) {
+          skippedAlreadyProcessedNodes += 1;
+          continue;
+        }
+        replacements += matchedTextSpans.reduce((total, span) =>
+          total + smartReferenceLinkRanges(span.textContent ?? "").length / 2, 0);
         reveal(row);
         hiddenMarkerCount += concealBacklinkMatch(row);
         processedRows.set(row, row.innerHTML);
       }
       observer.takeRecords();
       debugLog(() => ["[Smart Reference] Backlinks cleanup", {
-        reason: trigger, target: pane, matchedBacklinkRows: rows.length, hiddenMarkerCount,
+        reason: trigger,
+        target: pane,
+        cleanupRuns,
+        matchedBacklinkRows: rows.length,
+        matchedElements,
+        replacements,
+        skippedAlreadyProcessedNodes,
+        hiddenMarkerCount,
       }]);
     };
     const scheduleSettledCleanup = (trigger: string) => {
       pendingReason = trigger;
-      if (pendingCleanup !== null) pane.ownerDocument.defaultView!.clearTimeout(pendingCleanup);
-      pendingCleanup = pane.ownerDocument.defaultView!.setTimeout(() => {
-        pendingCleanup = null;
-        clean(`${pendingReason}-settled`);
-      }, 0);
+      cancelFrame(pendingFrame);
+      cancelFrame(pendingSettledFrame);
+      pendingSettledFrame = null;
+      pendingFrame = requestFrame(() => {
+        pendingFrame = null;
+        clean(`${pendingReason}-frame`);
+        pendingSettledFrame = requestFrame(() => {
+          pendingSettledFrame = null;
+          clean(`${pendingReason}-settled`);
+        });
+      });
     };
     const refresh = (trigger = "workspace-refresh") => {
       clean(trigger);
@@ -181,12 +218,24 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     const stop = () => {
       if (disposed) return;
       disposed = true;
-      if (pendingCleanup !== null) pane.ownerDocument.defaultView!.clearTimeout(pendingCleanup);
+      cancelFrame(pendingFrame);
+      cancelFrame(pendingSettledFrame);
       observer.disconnect();
       reveal(pane);
       debugLog(() => ["[Smart Reference] Backlinks observer disconnected", { target: pane }]);
     };
     return Object.assign(stop, { refresh });
+  };
+  const refreshFromInteraction = (event: Event) => {
+    const view = root.ownerDocument.defaultView;
+    if (!view || !(event.target instanceof view.Element)) return;
+    const row = event.target.closest(MATCH);
+    const pane = row?.closest(PANE);
+    if (!row || !pane || !root.contains(pane)) return;
+    const relatedTarget = (event as PointerEvent | FocusEvent).relatedTarget;
+    if (relatedTarget instanceof view.Node && row.contains(relatedTarget)) return;
+    const cleanup = panes.get(pane);
+    if (cleanup) cleanup.refresh(`row-${event.type}`);
   };
   const reconcile = (reason: string, refreshExisting: boolean) => {
     if (stopped) return;
@@ -209,11 +258,15 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   };
   const discovery = new Observer(() => reconcile("pane-dom-recreated", false));
   discovery.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+  root.addEventListener("pointerover", refreshFromInteraction, true);
+  root.addEventListener("focusin", refreshFromInteraction, true);
   reconcile("initial-render", true);
   const stop = () => {
     if (stopped) return;
     stopped = true;
     discovery.disconnect();
+    root.removeEventListener("pointerover", refreshFromInteraction, true);
+    root.removeEventListener("focusin", refreshFromInteraction, true);
     for (const cleanup of panes.values()) cleanup();
     panes.clear();
   };

@@ -1042,3 +1042,15 @@ Obsidian overwrite changes the signature and is cleaned again. Drain mutations
 created by the wrapper operation and cancel pending timers on detach. This preserves
 the tappable row and avoids a self-sustaining MutationObserver loop without changing
 the matched-text parser or marker regexes.
+
+
+## D-061 — Cover Backlinks interaction rendering with finite frame passes
+
+Backlinks can rerender a row after view-mode switches, hover and focus even after
+an initial zero-delay cleanup. Preserve the existing parser and observer, but make
+each pane refresh perform an immediate pass followed by two debounced animation-
+frame passes, using zero-delay timers only when animation frames are unavailable.
+Route existing file/layout/active-leaf refreshes and delegated row `pointerover` and
+`focusin` events through that scheduler. Cancel pending frames on replacement or
+unload. The cleaned-markup WeakMap makes these finite follow-up runs read-only for
+unchanged rows, preserving clicks and preventing observer feedback loops.

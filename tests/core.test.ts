@@ -963,6 +963,62 @@ test("Backlinks reapplies cleanup after a later renderer overwrite without loopi
   stop();
 });
 
+test("Backlinks hover and focus refresh delayed rows and report lifecycle counters", async () => {
+  const { document, window } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[Target#^sr-initial|initial alias]]</span><span>%%ref:initial%%</span></div></div></body></html>');
+  const originalDebug = console.debug;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const messages: unknown[][] = [];
+  let stop: (() => void) | undefined;
+  const settle = async () => {
+    for (let index = 0; index < 4; index += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  };
+  try {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => "true" },
+    });
+    console.debug = (...args) => { messages.push(args); };
+    stop = startBacklinksCleanup(document.body);
+    const row = document.querySelector('.search-result-file-match')!;
+    let clicks = 0;
+    row.addEventListener('click', () => clicks++);
+    row.addEventListener('pointerover', () => {
+      window.setTimeout(() => {
+        row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-hover|hover alias]]</span><span>&lt;!--smart-ref:hover--&gt;</span>';
+      }, 0);
+    }, { once: true });
+    row.dispatchEvent(new window.MouseEvent('pointerover', { bubbles: true }));
+    await settle();
+    assert.equal(visibleSnippetText(row), 'hover alias');
+
+    row.addEventListener('focusin', () => {
+      window.setTimeout(() => {
+        row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-focus|focus alias]]</span><span>%%ref:focus%%</span>';
+      }, 0);
+    }, { once: true });
+    row.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+    await settle();
+    assert.equal(visibleSnippetText(row), 'focus alias');
+    row.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(clicks, 1);
+
+    const counters = messages
+      .filter(([label]) => label === "[Smart Reference] Backlinks cleanup")
+      .map(([, details]) => details as Record<string, number>);
+    assert.ok(counters.some(({ cleanupRuns }) => cleanupRuns >= 2));
+    assert.ok(counters.some(({ matchedElements }) => matchedElements === 1));
+    assert.ok(counters.some(({ replacements }) => replacements === 1));
+    assert.ok(counters.some(({ skippedAlreadyProcessedNodes }) => skippedAlreadyProcessedNodes === 1));
+  } finally {
+    stop?.();
+    console.debug = originalDebug;
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
 test("CM6 hides internal-link fragments and metadata while Source and exact marks remain intact", async () => {
   const dom = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
   const globals = ['window', 'document', 'MutationObserver', 'Window', 'HTMLElement', 'Node', 'getComputedStyle'];

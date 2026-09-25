@@ -63,9 +63,12 @@
   check and reports text, regex match and replacement preview.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
   file, leaf and layout changes, so rebuilt panes and rows are cleaned again. Each
-  mutation receives an immediate cleanup plus a debounced settled pass. A WeakMap
-  DOM signature skips unchanged rows, preventing plugin-authored wrappers from
-  causing repeated writes or observer loops.
+  mutation and workspace refresh receives an immediate cleanup plus two debounced
+  animation-frame passes. Delegated `pointerover` and `focusin` handlers schedule
+  the same passes for delayed row rerenders. A WeakMap DOM signature skips unchanged
+  rows, preventing plugin-authored wrappers from causing repeated writes or loops.
+- Optional cleanup diagnostics now include cumulative cleanup runs plus per-run
+  matched-element, replacement and already-processed skip counts.
 
 ## Integration cleanup
 
@@ -83,7 +86,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 72 passed
+- `npm test`: 73 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

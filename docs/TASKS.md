@@ -22,6 +22,8 @@
 - [x] Capture real Backlinks DOM: tappable row, matched-text link syntax, sibling marker, no anchors
 - [x] Scope alias conversion to matched-text child nodes and remove temporary DOM diagnostics
 - [x] Reapply cleanup after renderer mutations settle and skip unchanged processed rows
+- [x] Refresh over two frames after workspace, hover and focus render cycles
+- [x] Count cleanup runs, matched elements, replacements and processed-row skips
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
@@ -780,6 +782,8 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] 61 tests, typecheck, build and diff check pass
 - [x] Add immediate plus debounced settled cleanup after Obsidian overwrites a row
 - [x] Preserve row clicks and prove settled wrappers are not repeatedly rewritten
+- [x] Handle active-leaf/layout refreshes and delegated row hover/focus rerenders
+- [x] Regression-test delayed hover/focus rewrites, lifecycle counters and no loops
 - [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
 
