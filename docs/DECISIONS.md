@@ -1017,3 +1017,16 @@ characters in the target, and conceal only the generated link's opening syntax a
 closing brackets. Continue using reversible wrappers so existing anchors, hrefs
 and event handlers survive. Normal Wiki Links remain unchanged. Match standalone
 reserved IDs as `^sr-[a-z0-9]+`, consistent with generated reference syntax.
+
+
+## D-059 — Scope Backlinks alias conversion to the matched-text span
+
+Real Obsidian Backlinks rows have no link elements: the
+`.search-result-file-match.tappable` row owns click behavior, raw Wiki Link syntax
+is inside `.search-result-file-matched-text`, and ref metadata can occupy a sibling
+span. Parse and conceal Smart Reference Wiki Link prefixes/suffixes only within each
+matched-text span. Continue matching complete reserved metadata and standalone
+generated IDs over the containing row so sibling markers are hidden. Modify only
+the affected child Text nodes with reversible wrappers; never replace row
+`textContent` or the tappable row. This preserves native row interaction and leaves
+normal Wiki Links unchanged.

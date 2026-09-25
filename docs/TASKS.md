@@ -19,7 +19,8 @@
 - [x] Render raw Smart Reference Wiki Links as aliases in Backlinks while preserving anchors
 - [x] Parse Smart Reference Backlinks split across nested rendered text nodes
 - [x] Add temporary before/after DOM, child-class, text-owner and rerender diagnostics
-- [ ] Capture real Backlinks diagnostic output before changing the parser again
+- [x] Capture real Backlinks DOM: tappable row, matched-text link syntax, sibling marker, no anchors
+- [x] Scope alias conversion to matched-text child nodes and remove temporary DOM diagnostics
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
@@ -817,8 +818,10 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Report unmatched prefixes, skip reasons and hidden marker count
 - [x] Confirm supplied literal examples match even across nested text spans
 - [x] Preserve observer lifecycle and unrelated code; 67 tests/typecheck/build pass
-- [ ] Capture failing real-Vault row diagnostics (actual root cause still unknown)
-- [ ] Reproduce actual missed shape, then implement and test the minimal fix
+- [x] Capture failing real-Vault row: matched-text owns raw Wiki Link; sibling owns marker
+- [x] Reproduce actual shape and conceal only child Text-node ranges without replacing row
+- [x] Cover one/multiple Smart References and unchanged normal Wiki Links
+- [ ] Real Vault: verify aliases and row-native navigation after final cleanup
 
 
 ## Live Preview metadata formats

@@ -107,14 +107,14 @@ editor highlighting works when the existing navigation/command opens that target
 
 A document-level discovery observer and pane observers clean complete
 `%%ref:id%%`, `<!--smart-ref:id-->` and generated `^sr-[a-z0-9]+` text
-tokens within `.backlink-pane .search-result-file-match` rows. The full row is scanned, including nested
-`.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
-textContent, link elements, href attributes and native handlers; no Markdown or
-metadata is rewritten. When Backlinks exposes a generated Wiki Link as raw text,
-the wrappers conceal `[[Target#^sr-id|` and `]]`, leaving only its alias visible.
-The parser works over aggregated row text, tolerating syntax split across nested
-highlight nodes, line breaks and zero-width rendering characters. Normal Wiki
-Links remain unchanged. Split tokens and delayed text updates are supported.
+tokens within `.backlink-pane .search-result-file-match` rows. Smart Reference Wiki
+Links are parsed only inside `.search-result-file-matched-text`; wrappers conceal
+`[[Target#^sr-id|` and `]]`, leaving only the alias. Reserved metadata is also
+matched across the row because Obsidian renders its comment in a sibling span.
+Hidden wrappers preserve the original text nodes and the clickable row; no row
+`textContent`, Markdown or metadata is rewritten. The parser tolerates syntax split
+across nested highlight nodes, line breaks and zero-width rendering characters.
+Normal Wiki Links remain unchanged. Split tokens and delayed updates are supported.
 Each workspace document has a discovery observer above its body and one cleanup
 observer attached to each current `.backlink-pane`. File-open, active-view and
 layout events reconcile actual pane identities: removed panes are disconnected,
@@ -125,8 +125,9 @@ observers and removes wrappers; Source and Live Preview are unchanged.
 
 This depends on Obsidian’s private Backlinks DOM. The confirmed hierarchy is
 `.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
-`.search-result-file-matched-text`. Other layouts, global search and truncated markers
-are not covered. Workspace pop-out documents use the same scoped cleanup.
+`.search-result-file-matched-text`; the result row is clickable and does not contain
+an anchor element. Other layouts, global search and truncated markers are not
+covered. Workspace pop-out documents use the same scoped cleanup.
 Optional debug logs report workspace events, observer attachment and disconnection,
 matched row counts and hidden marker counts.
 For Backlinks troubleshooting, enable the runtime debug switch and inspect

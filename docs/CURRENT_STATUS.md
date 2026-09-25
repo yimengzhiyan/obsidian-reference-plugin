@@ -48,37 +48,28 @@
 
 ## Backlinks display status
 
-- Runtime diagnostics confirmed the observer cleans current rows and metadata
-  markers, but hiding only the generated block token left broken display text such
-  as `[[Target#|alias]]`. Backlinks cleanup now recognizes the complete generated
-  Wiki Link and hides its opening syntax and closing brackets, leaving only alias.
-- A later Vault check still exposed complete syntax when Backlinks split a rendered
-  link across nodes. The matcher now parses aggregated row Wiki Links, finds the
-  unescaped alias separator, and tolerates nested-node line breaks and zero-width
-  characters. Standalone generated IDs use the full reserved lowercase-alphanumeric
-  pattern rather than the earlier eight-hex-only subset.
-- That parser also failed in the real Vault, and runtime inspection confirmed the
-  Backlinks pane contains zero `<a>` elements. Temporary opt-in diagnostics now log
-  every Smart Reference row's `outerHTML` immediately before and after cleanup,
-  every descendant tag/class, the exact Text node containing `^sr-` with its
-  parent/ancestor chain, candidate clickable elements, observer mutation records,
-  row identity changes and whether previously cleaned content was restored. No
-  further parser change is included in this diagnostic commit.
-- The correction uses the existing hidden text wrappers, preserving any enclosing
-  anchor, href and event handlers. Ordinary Wiki Links remain unchanged.
+- Real Vault DOM inspection established that Backlinks rows contain no anchors.
+  `.search-result-file-match.tappable` owns interaction, the raw Wiki Link is under
+  `.search-result-file-matched-text`, and the HTML ref marker can be in a sibling
+  span. The final cleanup parses Smart Reference Wiki Links only inside matched-text
+  spans and conceals their opening/closing syntax, leaving aliases visible.
+- Reserved HTML/legacy markers and standalone generated IDs are still matched over
+  the row so sibling metadata is hidden. Cleanup wraps the affected child Text
+  nodes without replacing `row.textContent`, preserving the tappable row identity,
+  listeners and native navigation. Multiple references and syntax split across
+  nested highlight spans are covered. Normal Wiki Links remain unchanged.
+- The unconditional full-row log and temporary DOM ownership/rerender snapshots
+  used for diagnosis have been removed. Concise cleanup and lifecycle counts remain
+  available through `SMART_REFERENCE_DEBUG`.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
-  file, leaf and layout changes. Users reported that some rows remained visible
-  after earlier repairs. The literal reported markers match in DOM fixtures, but
-  no failing row's actual DOM has yet been captured from these new lifecycle logs.
-  Do not claim the issue resolved until that evidence identifies the owner/rerender.
+  file, leaf and layout changes, so rebuilt panes and rows are cleaned again.
 
 ## Integration cleanup
 
 Reviewed the commits from `main` through this branch. Functional changes for
 creation, marker association, Reading View, Live Preview, editor decoration and
-Backlinks remain. Detailed Reading View text dumps and redundant source-text
-diagnostics remain removed. Temporarily restored Backlinks row HTML/node snapshots
-after the real Vault disproved the parser-only fix. Retained concise optional logs
+Backlinks remain. Detailed Reading View text dumps, redundant source-text diagnostics
+and the temporary Backlinks row HTML/node snapshots are removed. Retained concise optional logs
 for click resolution, applied highlight kind/fallback, editor decoration, metadata
 concealment and Backlinks observer lifecycle/counts.
 
@@ -89,7 +80,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 70 passed
+- `npm test`: 71 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
@@ -99,9 +90,7 @@ for Backlinks selectors were deleted.
   the generated target fragment.
 - Real Vault: confirm generated target block IDs are hidden in Reading View and
   Live Preview while raw Source and normal user block IDs remain visible.
-- Real Vault: validate Backlinks after opening, switching and clicking notes. If a
-  row still leaks, enable debug logging and inspect that row's actual DOM before
-  changing the matcher.
+- Real Vault: validate Backlinks aliases after opening, switching and clicking notes.
 - Real Vault: confirm generated Backlinks Wiki Links display only their aliases and
   retain native backlink interaction.
 - Real Vault: smoke-test navigation and exact highlighting in both views.

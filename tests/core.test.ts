@@ -818,28 +818,33 @@ test("Backlinks row cleanup hides all reserved tokens across nested and sibling 
 });
 
 test("Backlinks renders a Smart Reference Wiki Link as its alias", () => {
-  const { document, window } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><a href="Target#^sr-id">[[Target#^sr-id|alias]]</a>&lt;!--smart-ref:uuid--&gt;</div></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span>context </span><span class="search-result-file-matched-text">[[Target#^sr-id|alias]]</span><span>&lt;!--smart-ref:uuid--&gt;</span></div></div></body></html>');
   const row = document.querySelector('.search-result-file-match')!;
-  const anchor = row.querySelector('a')!;
   let clicks = 0;
-  anchor.addEventListener('click', () => clicks++);
+  row.addEventListener('click', () => clicks++);
   assert.equal(concealBacklinkMatch(row), 3);
-  assert.equal(visibleSnippetText(row), 'alias');
-  assert.equal(row.querySelector('a'), anchor);
-  assert.equal(anchor.getAttribute('href'), 'Target#^sr-id');
-  anchor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  assert.equal(visibleSnippetText(row), 'context alias');
+  assert.equal(row.className, 'search-result-file-match tappable');
+  row.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   assert.equal(clicks, 1);
 });
 
+test("Backlinks renders multiple Smart Reference Wiki Links as aliases", () => {
+  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[One#^sr-one|first]] and [[Two#^sr-two|second]]</span><span>%%ref:one%% &lt;!--smart-ref:two--&gt;</span></div></div></body></html>');
+  const row = document.querySelector('.search-result-file-match')!;
+  assert.equal(concealBacklinkMatch(row), 6);
+  assert.equal(visibleSnippetText(row), 'first and second ');
+});
+
 test("Backlinks leaves normal Wiki Links unchanged", () => {
-  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match">[[Target#^normal-id|normal alias]]</div></div></body></html>');
+  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><span class="search-result-file-matched-text">[[Target#^normal-id|normal alias]]</span></div></div></body></html>');
   const row = document.querySelector('.search-result-file-match')!;
   assert.equal(concealBacklinkMatch(row), 0);
   assert.equal(visibleSnippetText(row), '[[Target#^normal-id|normal alias]]');
 });
 
 test("Backlinks renders a split Smart Reference link as its alias", () => {
-  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><span>[[Folder/Target#^sr-</span><span>fa1b9d4b</span><span>\n|split alias]]</span>\n&lt;!--smart-<span>ref:uuid</span>--&gt; <span>[[Normal#^user-id|normal link]]</span></div></div></body></html>');
+  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><span class="search-result-file-matched-text"><span>[[Folder/Target#^sr-</span><span>fa1b9d4b</span><span>\n|split alias]]</span></span>\n&lt;!--smart-<span>ref:uuid</span>--&gt; <span>[[Normal#^user-id|normal link]]</span></div></div></body></html>');
   const row = document.querySelector('.search-result-file-match')!;
   assert.equal(concealBacklinkMatch(row), 3);
   assert.equal(visibleSnippetText(row), 'split alias\n [[Normal#^user-id|normal link]]');
@@ -929,44 +934,6 @@ test("Backlinks persistent observer repairs refreshed wrapper visibility without
   assert.equal(pane.querySelector('.smart-ref-hidden-backlink-metadata'), currentWrapper,
     'our own wrappers must not cause a repeated cleanup loop');
   stop();
-});
-
-test("Backlinks debug records row ownership, cleanup output, click targets and rerenders", async () => {
-  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><span class="search-result-file-matched-text">[[Target#<span class="search-result-file-match-highlight">^sr-id</span>|alias]]</span>&lt;!--smart-ref:uuid--&gt;</div></div></body></html>');
-  const originalDebug = console.debug;
-  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
-  const messages: unknown[][] = [];
-  try {
-    Object.defineProperty(globalThis, "localStorage", {
-      configurable: true,
-      value: { getItem: () => "true" },
-    });
-    console.debug = (...args) => { messages.push(args); };
-    const stop = startBacklinksCleanup(document.body);
-    const row = document.querySelector('.search-result-file-match')!;
-    row.innerHTML = '<span class="search-result-file-matched-text">[[Target#<span class="search-result-file-match-highlight">^sr-next</span>|next alias]]</span>%%ref:next%%';
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    stop();
-
-    const beforeMessages = messages.filter(([label]) => label === "[Smart Reference] Backlinks row before cleanup");
-    const before = beforeMessages[0][1] as Record<string, unknown>;
-    const restored = beforeMessages.find(([, details]) => (details as Record<string, unknown>).rawContentRestored === true)?.[1] as Record<string, unknown>;
-    const after = messages.find(([label]) => label === "[Smart Reference] Backlinks row after cleanup")?.[1] as Record<string, unknown>;
-    assert.ok(before.beforeOuterHTML);
-    assert.ok(Array.isArray(before.childElements));
-    assert.ok(Array.isArray(before.textNodeOwners));
-    const smartText = before.smartReferenceTextNodes as Array<Record<string, unknown>>;
-    assert.equal(smartText.length, 1);
-    assert.equal(smartText[0].parentClass, "search-result-file-match-highlight");
-    assert.deepEqual(before.clickableElements, []);
-    assert.equal(restored.contentChangedAfterPreviousCleanup, true);
-    assert.ok(after.afterOuterHTML);
-    assert.ok(messages.some(([label]) => label === "[Smart Reference] Backlinks observer triggered"));
-  } finally {
-    console.debug = originalDebug;
-    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
-    else Reflect.deleteProperty(globalThis, "localStorage");
-  }
 });
 
 test("CM6 hides internal-link fragments and metadata while Source and exact marks remain intact", async () => {
