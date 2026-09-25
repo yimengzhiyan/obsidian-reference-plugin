@@ -189,6 +189,7 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
       for (const row of rows) {
         const hasSmartReference = SMART_REFERENCE_EVIDENCE.test(row.textContent ?? "");
         if (hasSmartReference) {
+          console.log("[Smart Reference] FULL ROW DOM", row.outerHTML);
           debugLog(() => {
             const previousPostCleanupOuterHTML = postCleanupSnapshots.get(row) ?? null;
             const beforeOuterHTML = row.outerHTML;
