@@ -1054,3 +1054,16 @@ Route existing file/layout/active-leaf refreshes and delegated row `pointerover`
 `focusin` events through that scheduler. Cancel pending frames on replacement or
 unload. The cleaned-markup WeakMap makes these finite follow-up runs read-only for
 unchanged rows, preserving clicks and preventing observer feedback loops.
+
+
+## D-062 — Detect Markdown view mode changes through public state
+
+The public Obsidian API exposes `MarkdownView.getMode()` but no dedicated mode-
+change workspace event. Track the last mode for each Markdown view, compare it on
+file/layout/active-leaf synchronization, and observe the view container for the DOM
+changes that accompany manual Reading View/Live Preview switches. Only a changed
+mode triggers Backlinks cleanup; ordinary editor mutations perform the comparison
+without refreshing. Reuse the existing finite frame scheduler, and disconnect view
+observers when leaves disappear or the plugin unloads. Include the causal trigger
+in cleanup diagnostics so replacements can be attributed to mode switches or row
+pointer/focus rendering.

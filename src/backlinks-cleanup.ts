@@ -142,6 +142,8 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     const view = pane.ownerDocument.defaultView!;
     let disposed = false;
     let cleanupRuns = 0;
+    let replacementsAfterModeSwitch = 0;
+    let replacementsAfterPointerFocus = 0;
     let pendingReason = "pane-mutation";
     type FrameHandle = { id: number; kind: "animation-frame" | "timeout" };
     let pendingFrame: FrameHandle | null = null;
@@ -179,13 +181,23 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
         processedRows.set(row, row.innerHTML);
       }
       observer.takeRecords();
+      const cleanupTriggerSource = trigger.replace(/-(?:frame|settled)$/, "");
+      if (cleanupTriggerSource.startsWith("markdown-view-mode-change:")) {
+        replacementsAfterModeSwitch += replacements;
+      }
+      if (cleanupTriggerSource === "row-pointerover" || cleanupTriggerSource === "row-focusin") {
+        replacementsAfterPointerFocus += replacements;
+      }
       debugLog(() => ["[Smart Reference] Backlinks cleanup", {
         reason: trigger,
+        cleanupTriggerSource,
         target: pane,
         cleanupRuns,
         matchedBacklinkRows: rows.length,
         matchedElements,
         replacements,
+        replacementsAfterModeSwitch,
+        replacementsAfterPointerFocus,
         skippedAlreadyProcessedNodes,
         hiddenMarkerCount,
       }]);
@@ -201,12 +213,16 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
         pendingSettledFrame = requestFrame(() => {
           pendingSettledFrame = null;
           clean(`${pendingReason}-settled`);
+          pendingReason = "pane-mutation";
         });
       });
     };
     const refresh = (trigger = "workspace-refresh") => {
-      clean(trigger);
-      scheduleSettledCleanup(trigger);
+      const effectiveTrigger = trigger === "pane-mutation" && pendingReason !== "pane-mutation"
+        ? pendingReason
+        : trigger;
+      clean(effectiveTrigger);
+      scheduleSettledCleanup(effectiveTrigger);
     };
     const observer = new Observer(() => refresh("pane-mutation"));
     observer.observe(pane, {
@@ -271,6 +287,70 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     panes.clear();
   };
   return Object.assign(stop, { refresh: (reason = "workspace-refresh") => reconcile(reason, true) });
+}
+
+
+export interface MarkdownViewModeSource {
+  containerEl: HTMLElement;
+  getMode(): string;
+}
+
+export interface MarkdownViewModeChange {
+  view: MarkdownViewModeSource;
+  from: string;
+  to: string;
+  trigger: string;
+}
+
+/** Observe public getMode() changes without depending on private Obsidian events. */
+export function createMarkdownViewModeWatcher(
+  onChange: (change: MarkdownViewModeChange) => void,
+) {
+  type Record = { container: HTMLElement; mode: string; observer: MutationObserver };
+  const records = new Map<MarkdownViewModeSource, Record>();
+  let stopped = false;
+  const check = (view: MarkdownViewModeSource, trigger: string) => {
+    const record = records.get(view);
+    if (!record) return;
+    const mode = view.getMode();
+    if (mode === record.mode) return;
+    const from = record.mode;
+    record.mode = mode;
+    onChange({ view, from, to: mode, trigger });
+  };
+  const attach = (view: MarkdownViewModeSource) => {
+    const Observer = view.containerEl.ownerDocument.defaultView?.MutationObserver;
+    if (!Observer) return;
+    const observer = new Observer(() => check(view, "view-dom-mutation"));
+    records.set(view, { container: view.containerEl, mode: view.getMode(), observer });
+    observer.observe(view.containerEl, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+  };
+  return {
+    sync(views: Iterable<MarkdownViewModeSource>, trigger = "workspace-sync"): void {
+      if (stopped) return;
+      const current = new Set(views);
+      for (const [view, record] of records) {
+        if (!current.has(view) || record.container !== view.containerEl) {
+          record.observer.disconnect();
+          records.delete(view);
+        }
+      }
+      for (const view of current) {
+        if (!records.has(view)) attach(view);
+        else check(view, trigger);
+      }
+    },
+    destroy(): void {
+      stopped = true;
+      for (const record of records.values()) record.observer.disconnect();
+      records.clear();
+    },
+  };
 }
 
 

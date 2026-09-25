@@ -67,8 +67,13 @@
   animation-frame passes. Delegated `pointerover` and `focusin` handlers schedule
   the same passes for delayed row rerenders. A WeakMap DOM signature skips unchanged
   rows, preventing plugin-authored wrappers from causing repeated writes or loops.
-- Optional cleanup diagnostics now include cumulative cleanup runs plus per-run
-  matched-element, replacement and already-processed skip counts.
+- Because Obsidian exposes `MarkdownView.getMode()` but no public mode-change event,
+  a lightweight observer compares each tracked view's mode after container changes
+  and during file/layout/active-leaf workspace synchronization. A detected
+  `preview ↔ source` transition triggers the same delayed Backlinks refresh.
+- Optional cleanup diagnostics now include the trigger source, cumulative cleanup
+  runs, per-run matches/replacements/skips, and cumulative replacements attributed
+  to mode switches versus pointer/focus interactions.
 
 ## Integration cleanup
 
@@ -86,7 +91,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 73 passed
+- `npm test`: 74 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

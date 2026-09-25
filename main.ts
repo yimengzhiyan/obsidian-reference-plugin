@@ -1,5 +1,8 @@
 import { debugLog } from "./src/debug.ts";
-import { createBacklinksCleanupManager } from "./src/backlinks-cleanup.ts";
+import {
+  createBacklinksCleanupManager,
+  createMarkdownViewModeWatcher,
+} from "./src/backlinks-cleanup.ts";
 import {
   Editor,
   editorLivePreviewField,
@@ -51,12 +54,24 @@ export default class ReferencePlugin extends Plugin {
     this.registerEditorExtension(preciseHighlightField);
     this.registerEditorExtension(createMetadataHidingField(editorLivePreviewField));
     const backlinks = createBacklinksCleanupManager();
+    const markdownViewModes = createMarkdownViewModeWatcher(({ view, from, to, trigger }) => {
+      backlinks.attach(view.containerEl.ownerDocument);
+      backlinks.refresh(`markdown-view-mode-change:${from}-to-${to}:${trigger}`);
+    });
     const refreshBacklinks = (event: string) => {
+      const markdownViews: MarkdownView[] = [];
       backlinks.attach(document);
-      this.app.workspace.iterateAllLeaves((leaf) => backlinks.attach(leaf.view.containerEl.ownerDocument));
+      this.app.workspace.iterateAllLeaves((leaf) => {
+        backlinks.attach(leaf.view.containerEl.ownerDocument);
+        if (leaf.view instanceof MarkdownView) markdownViews.push(leaf.view);
+      });
+      markdownViewModes.sync(markdownViews, event);
       backlinks.refresh(event);
     };
-    this.register(() => backlinks.destroy());
+    this.register(() => {
+      markdownViewModes.destroy();
+      backlinks.destroy();
+    });
     this.registerEvent(this.app.workspace.on("file-open", () => refreshBacklinks("file-open")));
     this.registerEvent(this.app.workspace.on("layout-change", () => refreshBacklinks("layout-change")));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => refreshBacklinks("active-leaf-change")));

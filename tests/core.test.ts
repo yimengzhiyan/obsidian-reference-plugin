@@ -1,6 +1,11 @@
 import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
-import { concealBacklinkMatch, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
+import {
+  concealBacklinkMatch,
+  createBacklinksCleanupManager,
+  createMarkdownViewModeWatcher,
+  startBacklinksCleanup,
+} from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField, findLivePreviewHiddenRanges } from "../src/metadata-hiding.ts";
 import { concealRenderedSmartReferenceBlockIds } from "../src/rendered-metadata.ts";
 import { debugLog } from "../src/debug.ts";
@@ -1006,13 +1011,79 @@ test("Backlinks hover and focus refresh delayed rows and report lifecycle counte
 
     const counters = messages
       .filter(([label]) => label === "[Smart Reference] Backlinks cleanup")
-      .map(([, details]) => details as Record<string, number>);
-    assert.ok(counters.some(({ cleanupRuns }) => cleanupRuns >= 2));
-    assert.ok(counters.some(({ matchedElements }) => matchedElements === 1));
-    assert.ok(counters.some(({ replacements }) => replacements === 1));
-    assert.ok(counters.some(({ skippedAlreadyProcessedNodes }) => skippedAlreadyProcessedNodes === 1));
+      .map(([, details]) => details as Record<string, number | string>);
+    assert.ok(counters.some(({ cleanupRuns }) => Number(cleanupRuns) >= 2));
+    assert.ok(counters.some(({ matchedElements }) => Number(matchedElements) === 1));
+    assert.ok(counters.some(({ replacements }) => Number(replacements) === 1));
+    assert.ok(counters.some(({ skippedAlreadyProcessedNodes }) => Number(skippedAlreadyProcessedNodes) === 1));
+    assert.ok(counters.some(({ cleanupTriggerSource }) =>
+      cleanupTriggerSource === "row-pointerover" || cleanupTriggerSource === "row-focusin"));
+    assert.ok(counters.some(({ replacementsAfterPointerFocus }) => Number(replacementsAfterPointerFocus) >= 1));
   } finally {
     stop?.();
+    console.debug = originalDebug;
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
+test("Markdown view mode transitions refresh Backlinks and report mode replacements", async () => {
+  const { document } = parseHTML('<html><body><div class="markdown-view"></div><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[Target#^sr-initial|initial alias]]</span></div></div></body></html>');
+  const originalDebug = console.debug;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const messages: unknown[][] = [];
+  const changes: Array<{ from: string; to: string; trigger: string }> = [];
+  const containerEl = document.querySelector<HTMLElement>('.markdown-view')!;
+  let mode = "preview";
+  const view = { containerEl, getMode: () => mode };
+  let manager: ReturnType<typeof createBacklinksCleanupManager> | undefined;
+  let watcher: ReturnType<typeof createMarkdownViewModeWatcher> | undefined;
+  const settle = async () => {
+    for (let index = 0; index < 4; index += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  };
+  try {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => "true" },
+    });
+    console.debug = (...args) => { messages.push(args); };
+    manager = createBacklinksCleanupManager();
+    watcher = createMarkdownViewModeWatcher(({ from, to, trigger }) => {
+      changes.push({ from, to, trigger });
+      manager!.refresh(`markdown-view-mode-change:${from}-to-${to}:${trigger}`);
+    });
+    watcher.sync([view], "plugin-load");
+    manager.attach(document);
+    const row = document.querySelector('.search-result-file-match')!;
+
+    row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-source|source alias]]</span>';
+    mode = "source";
+    watcher.sync([view], "layout-change");
+    await settle();
+    assert.equal(visibleSnippetText(row), 'source alias');
+
+    row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-preview|preview alias]]</span>';
+    mode = "preview";
+    containerEl.classList.add('is-preview-mode');
+    await settle();
+    assert.equal(visibleSnippetText(row), 'preview alias');
+    assert.deepEqual(changes, [
+      { from: 'preview', to: 'source', trigger: 'layout-change' },
+      { from: 'source', to: 'preview', trigger: 'view-dom-mutation' },
+    ]);
+
+    const counters = messages
+      .filter(([label]) => label === "[Smart Reference] Backlinks cleanup")
+      .map(([, details]) => details as Record<string, number | string>);
+    assert.ok(counters.some(({ cleanupTriggerSource }) =>
+      String(cleanupTriggerSource).startsWith('markdown-view-mode-change:')));
+    assert.ok(counters.some(({ replacementsAfterModeSwitch }) =>
+      Number(replacementsAfterModeSwitch) >= 1));
+  } finally {
+    watcher?.destroy();
+    manager?.destroy();
     console.debug = originalDebug;
     if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
     else Reflect.deleteProperty(globalThis, "localStorage");
