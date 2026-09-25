@@ -2,6 +2,7 @@ import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
 import { concealBacklinkMatch, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField, findLivePreviewHiddenRanges } from "../src/metadata-hiding.ts";
+import { concealRenderedSmartReferenceBlockIds } from "../src/rendered-metadata.ts";
 import { debugLog } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
@@ -647,11 +648,12 @@ test("metadata concealment coexists with exact editor marks and defaults to visi
   assert.equal(EditorState.create({ doc: source, extensions: [hiding] }).field(hiding).size, 0);
 });
 
-test("Live Preview conceals generated fragments only inside internal-link destinations", () => {
+test("Live Preview conceals generated link fragments and standalone IDs only", () => {
   const source = "Paragraph ^sr-9134bc06\n[[Target#^sr-f3f81c62|alias]] [[Target#^custom-id|normal]] [[Target#^sr-UPPER|keep]] [[Target#^sr-a1b2|escaped\\|alias]]";
   assert.deepEqual(findLivePreviewHiddenRanges(source).map(({ from, to, kind }) => ({
     text: source.slice(from, to), kind,
   })), [
+    { text: "^sr-9134bc06", kind: "block-id" },
     { text: "#^sr-f3f81c62", kind: "link-block-fragment" },
     { text: "#^sr-a1b2", kind: "link-block-fragment" },
   ]);
@@ -660,12 +662,28 @@ test("Live Preview conceals generated fragments only inside internal-link destin
   const original = state.doc.toString();
   const hidden: string[] = [];
   state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
-  assert.deepEqual(hidden, ["#^sr-f3f81c62", "#^sr-a1b2"]);
+  assert.deepEqual(hidden, ["^sr-9134bc06", "#^sr-f3f81c62", "#^sr-a1b2"]);
   state = state.update({ effects: setTestLivePreview.of(false) }).state;
   assert.equal(state.field(hiding).size, 0);
   assert.equal(state.doc.toString(), original);
   state = state.update({ effects: setTestLivePreview.of(true) }).state;
-  assert.equal(state.field(hiding).size, 2);
+  assert.equal(state.field(hiding).size, 3);
+});
+
+test("Reading View hides generated block IDs and preserves normal user IDs", () => {
+  const { document, window } = parseHTML('<html><body><div id="root"><p>Generated ^sr-fa1b9d4b</p><p>Normal ^my-custom-id</p></div></body></html>');
+  const root = document.querySelector<HTMLElement>("#root")!;
+  const original = root.textContent;
+  assert.equal(concealRenderedSmartReferenceBlockIds(
+    root,
+    "Generated ^sr-fa1b9d4b\n\nNormal ^my-custom-id",
+  ), 1);
+  const hidden = root.querySelector<HTMLElement>(".smart-ref-hidden-rendered-block-id")!;
+  assert.equal(hidden.textContent, "^sr-fa1b9d4b");
+  assert.equal(window.getComputedStyle(hidden).display, "none");
+  assert.equal(root.textContent, original);
+  assert.equal(root.querySelectorAll(".smart-ref-hidden-rendered-block-id").length, 1);
+  assert.ok(root.textContent?.includes("^my-custom-id"));
 });
 
 test("concealed internal-link fragments remain available for click resolution and exact decorations", () => {
@@ -921,7 +939,9 @@ test("CM6 hides internal-link fragments and metadata while Source and exact mark
   const ordinary = '<!--ordinary comment--> %%user content%%';
   const smartLink = '[[Target#^sr-az09|alias]]';
   const normalLink = '[[Target#^user-id|normal]]';
-  const source = `chosen words ${smartLink} ${normalLink}\n${htmlMarker} ${legacyMarker} ${ordinary}`;
+  const generatedBlock = 'Target text ^sr-deadbeef';
+  const normalBlock = 'Normal text ^my-custom-id';
+  const source = `chosen words ${smartLink} ${normalLink}\n${generatedBlock}\n${normalBlock}\n${htmlMarker} ${legacyMarker} ${ordinary}`;
   const smartLinkFrom = source.indexOf(smartLink);
   const normalLinkFrom = source.indexOf(normalLink);
   const errors: unknown[] = [];
@@ -940,7 +960,7 @@ test("CM6 hides internal-link fragments and metadata while Source and exact mark
       ],
     }) });
     assert.deepEqual(errors, []);
-    assert.equal(view.state.field(hiding).size, 3);
+    assert.equal(view.state.field(hiding).size, 4);
     const metadata = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.smart-ref-hidden-html-marker, .smart-ref-hidden-legacy-marker'));
     assert.deepEqual(metadata.map((node) => node.textContent), [htmlMarker, legacyMarker]);
     for (const node of metadata) assert.equal(dom.window.getComputedStyle(node).display, 'none');
@@ -950,7 +970,9 @@ test("CM6 hides internal-link fragments and metadata while Source and exact mark
     assert.ok(!visible.textContent?.includes(htmlMarker));
     assert.ok(!visible.textContent?.includes(legacyMarker));
     assert.ok(!view.contentDOM.textContent?.includes('#^sr-az09'));
+    assert.ok(!view.contentDOM.textContent?.includes('^sr-deadbeef'));
     assert.ok(view.contentDOM.textContent?.includes('#^user-id'));
+    assert.ok(view.contentDOM.textContent?.includes('^my-custom-id'));
     assert.equal(view.contentDOM.querySelectorAll('.cm-hmd-internal-link.cm-link-alias').length, 2);
     const normal = Array.from(view.contentDOM.querySelectorAll('.cm-hmd-internal-link'))
       .find((node) => node.textContent?.includes('#^user-id'))!;

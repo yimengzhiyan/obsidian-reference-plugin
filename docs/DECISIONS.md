@@ -994,3 +994,14 @@ range from the existing Live Preview StateField. Keep metadata on its working
 styled marks and retain `editorLivePreviewField` gating plus atomic ranges. Do not
 inspect `.cm-blockid`, `.cm-hmd-internal-link` or any other rendered DOM class.
 Normal Wiki Link fragments receive no decoration; Source has no replacement.
+
+
+## D-057 — Conceal generated target block IDs in rendered views
+
+Generated block IDs are source navigation anchors but should not be user-visible.
+In Live Preview, extend the source-range StateField to replace line-ending
+`^sr-[a-z0-9]+` IDs; `editorLivePreviewField` keeps Source raw. In Reading View,
+the Markdown postprocessor hides matching rendered text with a scoped wrapper,
+validating against section source when available. Preserve the text node, Markdown
+source and native block identity. Do not match normal IDs such as `^my-custom-id`.
+Navigation, exact highlighting and Backlinks logic remain unchanged.

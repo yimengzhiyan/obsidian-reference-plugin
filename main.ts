@@ -14,6 +14,7 @@ import {
 } from "obsidian";
 import { ensureBlockId } from "./src/blocks.ts";
 import { createMetadataHidingField } from "./src/metadata-hiding.ts";
+import { concealRenderedSmartReferenceBlockIds } from "./src/rendered-metadata.ts";
 import { preciseHighlightField } from "./src/highlight.ts";
 import {
   annotateRenderedSmartReferences,
@@ -70,8 +71,15 @@ export default class ReferencePlugin extends Plugin {
     });
     this.registerMarkdownPostProcessor((element, context) => {
       const firstLink = element.querySelector<HTMLElement>("a[href], a.internal-link");
+      const section = context.getSectionInfo(element) ?? (firstLink ? context.getSectionInfo(firstLink) : null);
+      const hiddenBlockIdCount = concealRenderedSmartReferenceBlockIds(element, section?.text ?? "");
+      if (hiddenBlockIdCount > 0) {
+        debugLog(() => ["[Smart Reference] Reading View block IDs hidden", {
+          sourcePath: context.sourcePath,
+          hiddenBlockIdCount,
+        }]);
+      }
       if (!firstLink) return;
-      const section = context.getSectionInfo(element) ?? context.getSectionInfo(firstLink);
       // HTML comments may survive rendering even when section source is unavailable.
       annotateRenderedSmartReferences(element, section?.text ?? "", (path) =>
         this.app.metadataCache.getFirstLinkpathDest(path, context.sourcePath)?.path ?? path

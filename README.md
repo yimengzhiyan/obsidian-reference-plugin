@@ -42,8 +42,8 @@ four-level reference UI is not implemented.
 
 The adjacent HTML comment is invisible in Reading View. Live Preview hides the
 `#^sr-[a-z0-9]+` destination fragment inside generated Wiki Links, adjacent HTML
-markers, and legacy `%%ref:id%%` markers using editor decorations. Source mode
-keeps raw Markdown visible. Alias edits do not change
+markers, legacy `%%ref:id%%` markers, and standalone generated `^sr-[a-z0-9]+`
+block IDs using editor decorations. Source mode keeps raw Markdown visible. Alias edits do not change
 reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
 markers remain readable; markers separated into another paragraph require explicit
 relocation with their original refId. Notes are not automatically migrated.
@@ -62,7 +62,9 @@ Markdown from the containing view. The source fallback pairs resolved target
 path/block ID and link order, counting ordinary links too. It never waits for
 annotation; ambiguous count mismatches retain native navigation. For an associated
 generated Smart Reference, the postprocessor also restores the source alias when
-Reading View displays the internal target name. Ordinary links are not rewritten.
+Reading View displays the internal target name. It hides generated standalone
+`^sr-[a-z0-9]+` block IDs in rendered text while retaining normal user block IDs.
+Ordinary links are not rewritten.
 
 After navigation, the locator finds the block in Markdown. Obsidian renders its
 current source into a detached container; normalized full block text identifies a
@@ -85,9 +87,9 @@ Native clicks are canceled only after those checks pass.
 
 A separate StateField parses the current CM6 document. It uses a replacement
 decoration for the `#^sr-[a-z0-9]+` fragment in generated Wiki Link destinations
-and inline-styled marks for complete Smart Reference metadata. It does not inspect
-rendered token class names. Ordinary block links, standalone block IDs, comments
-and pending-creation placeholders remain visible. The field applies only when
+and standalone generated `^sr-[a-z0-9]+` block IDs, plus inline-styled marks for
+complete Smart Reference metadata. It does not inspect rendered token class names.
+Ordinary block links, user block IDs, comments and pending-creation placeholders remain visible. The field applies only when
 Obsidian's public `editorLivePreviewField` is true, rebuilds after document or mode
 changes, and provides atomic cursor ranges. It never changes Markdown or source
 offsets. Switch to Source mode to inspect or edit the raw syntax.

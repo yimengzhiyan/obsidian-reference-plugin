@@ -23,6 +23,9 @@
 - Normal links, ambiguous associations and generated-looking links without a ref
   marker remain unchanged. Navigation attributes and highlight behavior are not
   modified. Real-Obsidian validation of the repaired display is still required.
+- The postprocessor also hides standalone generated `^sr-[a-z0-9]+` block IDs in
+  target note rendering. It requires a matching line-ending ID in section source
+  when available and leaves normal user IDs such as `^my-custom-id` visible.
 
 ## Current Live Preview concealment repair
 
@@ -31,9 +34,9 @@
   `posAtDOM`, measure callback and supplemental StateEffect path.
 - Live Preview now derives CM6 ranges from current Markdown. It hides only the
   `#^sr-[a-z0-9]+` fragment inside a Wiki Link destination, complete adjacent
-  `<!--smart-ref:id-->` markers and legacy `%%ref:id%%` markers. Standalone block
-  IDs and ordinary block-link destinations remain visible. Source mode has no
-  concealment ranges.
+  `<!--smart-ref:id-->` markers, legacy `%%ref:id%%` markers, and line-ending
+  generated `^sr-[a-z0-9]+` block IDs. User block IDs and ordinary block-link
+  destinations remain visible. Source mode has no concealment ranges.
 - Real-Obsidian validation then showed that the source range was correct but a
   CSS mark did not reliably conceal the fragment inside Obsidian's Wiki Link
   decoration. The fragment now uses `Decoration.replace()` directly on its CM6
@@ -73,7 +76,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 68 passed
+- `npm test`: 69 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
@@ -81,6 +84,8 @@ for Backlinks selectors were deleted.
   Preview, plus raw syntax in Source mode.
 - Real Vault: confirm Reading View displays the Smart Reference alias rather than
   the generated target fragment.
+- Real Vault: confirm generated target block IDs are hidden in Reading View and
+  Live Preview while raw Source and normal user block IDs remain visible.
 - Real Vault: validate Backlinks after opening, switching and clicking notes. If a
   row still leaks, enable debug logging and inspect that row's actual DOM before
   changing the matcher.

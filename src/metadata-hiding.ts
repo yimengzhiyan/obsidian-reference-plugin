@@ -5,7 +5,7 @@ import { debugLog } from "./debug.ts";
 export type HiddenSourceRange = {
   from: number;
   to: number;
-  kind: "link-block-fragment" | "html-marker" | "legacy-marker";
+  kind: "link-block-fragment" | "block-id" | "html-marker" | "legacy-marker";
 };
 
 const WIKI_LINK_PATTERN = /\[\[([^\]\n]+)\]\]/g;
@@ -25,6 +25,14 @@ export function findLivePreviewHiddenRanges(source: string): HiddenSourceRange[]
     ranges.push({ from, to: from + fragment[0].length, kind: "link-block-fragment" });
   }
 
+  for (const blockId of source.matchAll(/(?<!\S)\^sr-[a-z0-9]+(?=[ \t]*\r?$)/gm)) {
+    ranges.push({
+      from: blockId.index!,
+      to: blockId.index! + blockId[0].length,
+      kind: "block-id",
+    });
+  }
+
   for (const marker of source.matchAll(METADATA_PATTERN)) {
     ranges.push({
       from: marker.index!,
@@ -42,7 +50,7 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
     if (state.field(livePreview, false) !== true) return Decoration.none;
     const hidden = findLivePreviewHiddenRanges(state.doc.toString());
     const decorations = hidden.map(({ from, to, kind }) => (
-      kind === "link-block-fragment"
+      kind === "link-block-fragment" || kind === "block-id"
         ? Decoration.replace({ inclusive: false })
         : Decoration.mark({
           class: `smart-ref-hidden-${kind}`,
@@ -53,6 +61,7 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", {
       hiddenDecorationCount: decorations.length,
       linkBlockFragmentCount: hidden.filter((range) => range.kind === "link-block-fragment").length,
+      blockIdCount: hidden.filter((range) => range.kind === "block-id").length,
       htmlMarkerCount: hidden.filter((range) => range.kind === "html-marker").length,
       legacyMarkerCount: hidden.filter((range) => range.kind === "legacy-marker").length,
     }]);
