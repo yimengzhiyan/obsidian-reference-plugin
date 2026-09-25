@@ -25,7 +25,7 @@ Decisions remain historical; D-042 records the current validated integration sta
 
 ## Validation
 
-- npm test: 65 passed
+- npm test: 67 passed
 - npm run typecheck: passed
 - npm run build: passed
 - git diff --check: passed
@@ -238,3 +238,25 @@ stale-target disconnection and exactly one observer on each new pane after all t
 workspace events, including delayed recreation and unload. Real Obsidian validation
 remains: switch files/activate leaves/change layout and confirm marker concealment
 and navigation. Existing three untracked investigation files remain untouched.
+
+
+## Current task: partially cleaned Backlinks rows — diagnostics first
+
+User reports mixed success across rows; explicitly preserve observer lifecycle.
+Added SMART_REFERENCE_DEBUG-gated before/after serializable row snapshots:
+outerHTML, child nodes, all text nodes/offsets/parent HTML, actual comment nodes,
+matched marker types/ranges, unmatched candidate prefixes, skip reason and hidden
+marker count. Snapshot collection is disabled when debugging is off. Lifecycle,
+CM6, navigation, highlighting, Reading View and marker regex semantics are unchanged.
+
+67 tests, typecheck/build and diff check pass. The literal examples supplied by the
+user all match, including markers split among nested spans. Other diagnostics tests
+cover actual invisible comment nodes, incomplete/entity-encoded text and editor-guard
+skips. These are diagnostic distinctions, NOT a confirmed root cause in the Vault.
+No speculative matcher fix was applied. The requested minimal fix is pending actual
+failing-row evidence. Asked for row outerHTML; none has been supplied yet.
+
+Next: enable SMART_REFERENCE_DEBUG in src/debug.ts, rebuild/reload, reproduce mixed
+rows, copy [Smart Reference] Backlinks row diagnostic before/after payloads for a
+failure and a success. Use the actual shape to add a failing test and the minimal
+fix, keeping lifecycle unchanged. Existing untracked investigation files untouched.

@@ -796,3 +796,13 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Debug target attach/disconnect, workspace event and hidden marker count
 - [x] 65 tests, typecheck/build/diff check; observer-target assertions cover all events
 - [ ] Real Vault: switching files/leaf/layout keeps markers hidden and links working
+
+
+## Partially cleaned Backlinks rows: diagnosis
+
+- [x] Before/after snapshots: row HTML, child/text/comment nodes and marker types
+- [x] Report unmatched prefixes, skip reasons and hidden marker count
+- [x] Confirm supplied literal examples match even across nested text spans
+- [x] Preserve observer lifecycle and unrelated code; 67 tests/typecheck/build pass
+- [ ] Capture failing real-Vault row diagnostics (actual root cause still unknown)
+- [ ] Reproduce actual missed shape, then implement and test the minimal fix

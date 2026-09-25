@@ -1,4 +1,4 @@
-import { debugLog } from "./debug.ts";
+import { debugLog, SMART_REFERENCE_DEBUG } from "./debug.ts";
 
 // Obsidian's private Backlinks DOM: deliberately exclude global search and editors.
 const PANE = ".backlink-pane";
@@ -11,9 +11,62 @@ function reveal(root: Element): void {
   });
 }
 
+type MarkerType = "^sr-" | "%%ref:" | "<!--smart-ref-->";
+const markerType = (text: string): MarkerType => text.startsWith("^") ? "^sr-"
+  : text.startsWith("%%") ? "%%ref:" : "<!--smart-ref-->";
+const markerMatches = (text: string) => Array.from(text.matchAll(
+  /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->|(?<![A-Za-z0-9_])\^sr-[0-9a-f]{8}(?![A-Za-z0-9_-])/g,
+));
+const skipReason = (row: Element) => !row.matches(MATCH) ? "not-backlink-row"
+  : !row.closest(PANE) ? "outside-backlink-pane"
+  : row.closest(".cm-editor") ? "inside-cm-editor" : null;
+
+/** Serializable snapshots: browser console must not show later mutated live nodes. */
+export function inspectBacklinkRow(row: Element) {
+  const textNodes: Array<{ index: number; text: string; from: number; to: number; parentHTML: string; hiddenByPlugin: boolean }> = [];
+  const commentNodes: Array<{ text: string; reason: string }> = [];
+  let text = "";
+  const walker = row.ownerDocument.createTreeWalker(row, 4 | 128 /* TEXT | COMMENT */);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === 8) {
+      commentNodes.push({ text: node.textContent ?? "", reason: "DOM comments are already invisible" });
+      continue;
+    }
+    const from = text.length;
+    text += node.textContent ?? "";
+    textNodes.push({ index: textNodes.length, text: node.textContent ?? "", from, to: text.length,
+      parentHTML: node.parentElement?.outerHTML ?? "", hiddenByPlugin: Boolean(node.parentElement?.closest(`.${HIDDEN}`)) });
+  }
+  const matches = markerMatches(text).map((match) => ({
+    type: markerType(match[0]), text: match[0], from: match.index!, to: match.index! + match[0].length,
+  }));
+  const unmatchedMarkerCandidates = Array.from(text.matchAll(/\^sr-|%%ref:|(?:<!--|&lt;!--)smart-ref:/g))
+    .filter((hint) => !matches.some((match) => hint.index! >= match.from && hint.index! < match.to))
+    .map((hint) => ({ from: hint.index!, text: text.slice(hint.index!, hint.index! + 120),
+      reason: "prefix-present-but-complete-pattern-not-matched" }));
+  return {
+    outerHTML: row.outerHTML,
+    childNodes: Array.from(row.childNodes, (node) => ({
+      nodeType: node.nodeType, nodeName: node.nodeName, text: node.textContent,
+      outerHTML: node.nodeType === 1 ? (node as Element).outerHTML : null,
+    })),
+    textNodes, commentNodes, textContent: text, skipReason: skipReason(row),
+    matchedMarkerTypes: [...new Set(matches.map((match) => match.type))],
+    matches, unmatchedMarkerCandidates,
+  };
+}
+
+function logBacklinkRow(row: Element, phase: string, hiddenMarkerCount?: number): void {
+  if (!SMART_REFERENCE_DEBUG || !/\^sr-|%%ref:|smart-ref/.test(row.outerHTML)) return;
+  debugLog(() => ["[Smart Reference] Backlinks row diagnostic", {
+    phase, hiddenMarkerCount, ...inspectBacklinkRow(row),
+  }]);
+}
+
 /** Hide only complete reserved markers, even when search-match spans split them. */
 export function concealBacklinkMatch(snippet: Element): number {
-  if (!snippet.matches(MATCH) || !snippet.closest(PANE) || snippet.closest(".cm-editor")) return 0;
+  logBacklinkRow(snippet, "before-cleanup");
+  if (skipReason(snippet)) return 0;
   const doc = snippet.ownerDocument;
   const walker = doc.createTreeWalker(snippet, 4 /* SHOW_TEXT */);
   const nodes: Array<{ node: Text; from: number; to: number }> = [];
@@ -23,7 +76,7 @@ export function concealBacklinkMatch(snippet: Element): number {
     text += node.textContent ?? "";
     nodes.push({ node: node as Text, from, to: text.length });
   }
-  const matches = Array.from(text.matchAll(/%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->|(?<![A-Za-z0-9_])\^sr-[0-9a-f]{8}(?![A-Za-z0-9_-])/g));
+  const matches = markerMatches(text);
   let count = 0;
   // Work backwards so splitting a Text node cannot invalidate earlier offsets.
   for (const match of matches.reverse()) {
@@ -46,6 +99,7 @@ export function concealBacklinkMatch(snippet: Element): number {
     }
     if (hidden) count++;
   }
+  logBacklinkRow(snippet, "after-cleanup", count);
   return count;
 }
 

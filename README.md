@@ -122,6 +122,11 @@ This depends on private Obsidian Backlinks DOM. The confirmed hierarchy is
 are not covered. Workspace pop-out documents use the same scoped cleanup. Debug logging reports cleanup
 workspace event names, actual observer attachment/disconnection targets,
 `matchedBacklinkRows`, and `hiddenMarkerCount` (complete tokens, not wrapper spans), including zero-match runs.
+For partially cleaned rows, enable `SMART_REFERENCE_DEBUG` and filter for
+`Backlinks row diagnostic`. Before/after snapshots include outerHTML, child/text
+nodes, actual DOM comments, matched types/ranges, unmatched prefixes and skip
+reasons. These logs include note contents. Copy a failing row's before/after entries
+to diagnose its DOM shape; supplied literal markers already match in fixture tests.
 Real Vault validation remains pending for this repair.
 
 Future appearance, hover/focus and settings ideas are in
