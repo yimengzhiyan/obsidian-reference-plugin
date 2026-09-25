@@ -34,9 +34,14 @@
   `<!--smart-ref:id-->` markers and legacy `%%ref:id%%` markers. Standalone block
   IDs and ordinary block-link destinations remain visible. Source mode has no
   concealment ranges.
+- Real-Obsidian validation then showed that the source range was correct but a
+  CSS mark did not reliably conceal the fragment inside Obsidian's Wiki Link
+  decoration. The fragment now uses `Decoration.replace()` directly on its CM6
+  document range. Metadata keeps its existing styled marks.
 - The CM6 DOM fixture models alias internal-link spans and confirms exact source
-  ranges, visible ordinary syntax, Source-mode restoration, click association and
-  exact-highlight coexistence. Real-Obsidian validation is still required.
+  ranges, absence of the generated fragment, visible normal link fragments,
+  Source-mode restoration, click association and exact-highlight coexistence.
+  Real-Obsidian validation is still required.
 
 ## Backlinks display status
 

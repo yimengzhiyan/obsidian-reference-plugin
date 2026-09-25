@@ -41,11 +41,15 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
   const build = (state: EditorState): DecorationSet => {
     if (state.field(livePreview, false) !== true) return Decoration.none;
     const hidden = findLivePreviewHiddenRanges(state.doc.toString());
-    const decorations = hidden.map(({ from, to, kind }) => Decoration.mark({
-      class: `smart-ref-hidden-${kind}`,
-      attributes: { style: "display: none !important" },
-      inclusive: false,
-    }).range(from, to));
+    const decorations = hidden.map(({ from, to, kind }) => (
+      kind === "link-block-fragment"
+        ? Decoration.replace({ inclusive: false })
+        : Decoration.mark({
+          class: `smart-ref-hidden-${kind}`,
+          attributes: { style: "display: none !important" },
+          inclusive: false,
+        })
+    ).range(from, to));
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", {
       hiddenDecorationCount: decorations.length,
       linkBlockFragmentCount: hidden.filter((range) => range.kind === "link-block-fragment").length,

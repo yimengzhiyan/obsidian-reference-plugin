@@ -983,3 +983,14 @@ Link form and conceal its opening syntax and closing brackets, leaving its alias
 visible. Use the existing reversible text wrappers so enclosing anchors, hrefs and
 handlers survive when present. Do not transform ordinary Wiki Links. Markdown,
 Reading View, Live Preview, navigation and highlighting remain unchanged.
+
+
+## D-056 — Replace the generated link fragment by CM6 document range
+
+The source parser already identifies the exact `#^sr-[a-z0-9]+` range inside a
+generated Wiki Link, but a `display:none` mark is not reliable when combined with
+Obsidian's own Wiki Link decorations. Use `Decoration.replace()` for that document
+range from the existing Live Preview StateField. Keep metadata on its working
+styled marks and retain `editorLivePreviewField` gating plus atomic ranges. Do not
+inspect `.cm-blockid`, `.cm-hmd-internal-link` or any other rendered DOM class.
+Normal Wiki Link fragments receive no decoration; Source has no replacement.

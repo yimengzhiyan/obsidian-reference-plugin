@@ -83,14 +83,14 @@ Native clicks are canceled only after those checks pass.
 
 ### Editor decorations
 
-A separate StateField parses current Markdown and adds inline-styled CM6 marks for
-the `#^sr-[a-z0-9]+` fragment in Wiki Link destinations and for complete Smart
-Reference markers. It does not depend on rendered token class names. Ordinary block
-links, standalone block IDs, comments and pending-creation placeholders remain
-visible. The field applies only when Obsidian's public `editorLivePreviewField` is
-true, rebuilds after document or mode changes, and provides atomic cursor ranges.
-It never changes Markdown or source offsets. Switch to Source mode to inspect or
-edit the raw syntax.
+A separate StateField parses the current CM6 document. It uses a replacement
+decoration for the `#^sr-[a-z0-9]+` fragment in generated Wiki Link destinations
+and inline-styled marks for complete Smart Reference metadata. It does not inspect
+rendered token class names. Ordinary block links, standalone block IDs, comments
+and pending-creation placeholders remain visible. The field applies only when
+Obsidian's public `editorLivePreviewField` is true, rebuilds after document or mode
+changes, and provides atomic cursor ranges. It never changes Markdown or source
+offsets. Switch to Source mode to inspect or edit the raw syntax.
 
 
 For Live Preview/Source editor targets, the locator validates stored offsets,

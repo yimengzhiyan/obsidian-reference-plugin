@@ -682,7 +682,7 @@ test("concealed internal-link fragments remain available for click resolution an
   assert.equal(state.doc.toString(), source);
 });
 
-test("internal-link and metadata marks rebuild after source edits", () => {
+test("internal-link replacement and metadata marks rebuild after source edits", () => {
   const hiding = createMetadataHidingField(testLivePreviewField);
   let state = EditorState.create({
     doc: "[[Target#^sr-fa1b9d4b|alias]] %%ref:legacy%%",
@@ -693,7 +693,7 @@ test("internal-link and metadata marks rebuild after source edits", () => {
     specs.push({ text: state.doc.sliceString(from, to), className: decoration.spec.class });
   });
   assert.deepEqual(specs, [
-    { text: "#^sr-fa1b9d4b", className: "smart-ref-hidden-link-block-fragment" },
+    { text: "#^sr-fa1b9d4b", className: undefined },
     { text: "%%ref:legacy%%", className: "smart-ref-hidden-legacy-marker" },
   ]);
   const prefix = state.doc.toString().indexOf("sr-");
@@ -949,9 +949,8 @@ test("CM6 hides internal-link fragments and metadata while Source and exact mark
     assert.ok(visible.textContent?.includes(ordinary));
     assert.ok(!visible.textContent?.includes(htmlMarker));
     assert.ok(!visible.textContent?.includes(legacyMarker));
-    const hidden = view.contentDOM.querySelector<HTMLElement>('.smart-ref-hidden-link-block-fragment')!;
-    assert.equal(hidden.textContent, '#^sr-az09');
-    assert.equal(dom.window.getComputedStyle(hidden).display, 'none');
+    assert.ok(!view.contentDOM.textContent?.includes('#^sr-az09'));
+    assert.ok(view.contentDOM.textContent?.includes('#^user-id'));
     assert.equal(view.contentDOM.querySelectorAll('.cm-hmd-internal-link.cm-link-alias').length, 2);
     const normal = Array.from(view.contentDOM.querySelectorAll('.cm-hmd-internal-link'))
       .find((node) => node.textContent?.includes('#^user-id'))!;
