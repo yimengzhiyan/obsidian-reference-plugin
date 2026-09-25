@@ -1,280 +1,58 @@
 # CURRENT_STATUS
 
-**Phase:** Backlinks display cleanup and UI proposal; not merged
 **Branch:** `codex/live-preview-click-interception`
-**Environment:** Linux/Codex; real Obsidian workflow validation supplied by user
+**Phase:** Integration review; do not merge into main yet
+**Environment:** Linux/Codex; real Obsidian observations supplied by the user
 
-## Verified milestone
+## Implemented and user-verified
 
-The full workflow works. Reading View resolves clicks and highlights exact text
-using DOM Ranges. Live Preview intercepts cm-hmd-internal-link clicks, resolves
-refId, opens the target and applies exact CodeMirror decorations. Earlier whole-
-block observations must not be treated as remaining confirmed highlight defects.
+- Smart Reference creation, alias edits and source edits preserve navigation.
+- Reading View resolves links and highlights the selected text with DOM Ranges.
+- Live Preview intercepts internal-link spans, resolves refId, opens the target and
+  applies exact CodeMirror decorations.
+- Source mode retains raw Markdown. Plugin metadata and generated anchors remain
+  in the source for native block-link navigation.
+
+## Recent display changes that still need a Vault check
+
+- Live Preview uses CM6 marks to conceal generated `^sr-` anchors, adjacent
+  `<!--smart-ref:id-->` markers and legacy `%%ref:id%%` markers. The last change
+  switched both marker formats to styled marks. Its tests pass; no subsequent
+  real-Obsidian result has been supplied.
+- Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
+  file, leaf and layout changes. Users reported that some rows remained visible
+  after earlier repairs. The literal reported markers match in DOM fixtures, but
+  no failing row's actual DOM was captured. Do not claim the mixed-row issue is
+  resolved until the current build is validated in the Vault.
 
 ## Integration cleanup
 
-Reviewed the accumulated creation, marker/parser, view-specific click resolution,
-shared navigation, locator, DOM Range and CM6 decoration paths. Functional fixes
-are retained. Runtime diagnostics now use a shared lazy logger, disabled by default
-via SMART_REFERENCE_DEBUG=false in src/debug.ts. Payloads are not evaluated while
-disabled. Enable the source flag and rebuild/reload when investigating runtime issues.
+Reviewed the commits from `main` through this branch. Functional changes for
+creation, marker association, Reading View, Live Preview, editor decoration and
+Backlinks remain. Removed temporary row HTML/node snapshots, detailed Reading View
+text dumps and redundant source-text diagnostics. Retained concise optional logs
+for click resolution, applied highlight kind/fallback, editor decoration, metadata
+concealment and Backlinks observer lifecycle/counts.
 
-README documents Reading View source/DOM association, Live Preview source-offset
-resolution, editor decorations, fallback behavior, metadata and known limitations.
-Decisions remain historical; D-042 records the current validated integration state.
+`src/debug.ts` reads `localStorage.getItem("SMART_REFERENCE_DEBUG")` at runtime.
+Logging is off unless it equals `"true"`; payloads remain lazy. No setting or
+metadata field was added. The three zero-byte untracked investigation files named
+for Backlinks selectors were deleted.
 
-## Validation
+## Validation and remaining work
 
-- npm test: 67 passed
-- npm run typecheck: passed
-- npm run build: passed
-- git diff --check: passed
+- `npm test`: 65 passed
+- `npm run typecheck`: passed
+- `npm run build`: passed
+- `git diff --check`: passed
+- Real Vault: validate Live Preview metadata concealment and Source visibility.
+- Real Vault: validate Backlinks after opening, switching and clicking notes. If a
+  row still leaks, enable debug logging and inspect that row's actual DOM before
+  changing the matcher.
+- Real Vault: smoke-test navigation and exact highlighting in both views.
 
-The prior functional build is user-verified in Obsidian. This diagnostic/documentation
-cleanup is automatically checked; no new local Obsidian UI run was performed.
-
-## Remaining limits
-
-Ambiguous source/rendered counts retain native navigation. Identical rendered blocks,
-partial rendering, embedded notes and complex/plugin-generated Markdown remain
-limited. Raw Source click interception, automatic legacy-marker migration and target
-rename/move recovery are deferred. The editor.cm bridge is a compatibility risk.
-See README for exact behavior and the integration regression checklist.
-
-## Next action
-
-Review this branch for integration and optionally smoke-test the quiet build in the
-same Vault. Merge only when explicitly authorized; no merge was performed.
-
-
-## Live Preview cleanup
-
-Added a separate CM6 replacement-decoration field driven by Obsidian's public
-editorLivePreviewField. Complete %%ref:id%% and <!--smart-ref:id--> tokens are hidden
-in Live Preview, including detached legacy markers. Source mode shows raw Markdown.
-The document is unchanged; existing parser/click offsets and exact marks remain valid.
-Atomic cursor ranges skip concealed markers. Recompute on source/mode changes only.
-Ordinary comments, incomplete markers and pending placeholders are not concealed.
-
-Tests cover both formats, unchanged source/ref resolution, mode toggles, edits,
-incomplete markers and coexistence with exact-highlight decorations. Existing click
-and highlight implementations are untouched. A real Obsidian check remains for
-marker visibility, mode switching, alias clicks and both highlight strategies.
-
-
-## Generated target anchors
-
-User verified legacy ref markers are hidden in Live Preview and raw source remains
-visible. Extend the same replacement decorations to whitespace-delimited,
-line-ending ^sr- plus eight lowercase hexadecimal characters (the generator's
-format). Only anchor characters are hidden; whitespace, Markdown and offsets are
-unchanged. Ordinary/custom IDs and Wiki Link target fragments are not matched.
-No navigation, click, highlight or reference-store code changed.
-
-Tests verify mode toggling, exact-match exclusions, unchanged source, ref resolution,
-block lookup and exact-decoration coexistence. Real Obsidian confirmation remains:
-Live Preview hides target anchors; Source shows them; clicks still navigate and
-highlight the selected text.
-
-
-## Block-ID syntax token cleanup (supersedes replacement-only attempt)
-
-Runtime validation rejected a92e110: generated anchors remained visible as
-`<span class="cm-blockid">^sr-fa1b9d4b</span>`. State-only replacement tests did
-not establish actual Obsidian rendering behavior. The DOM observation confirms
-visible syntax tokens; the precise reason replacement lost at runtime is unproven.
-
-Generated anchors now receive a dedicated CM6 mark class with a scoped base theme
-that hides the mark and nested/co-located cm-blockid tokens. Only matching anchor
-source ranges receive the class; bare cm-blockid tokens are never globally hidden.
-Source mode removes all concealment marks. Legacy/HTML marker replacements remain.
-Debug-only diagnostics list matched block IDs and hidden decoration count (not a
-claim of measured DOM visibility). No navigation/click/highlight/storage changes.
-
-Validation: 53 tests, typecheck, build and diff check pass. Added mark-class and
-anchor-edit coverage; existing mode, exclusions, locator and exact-mark tests pass.
-No real Obsidian UI is available here. Next: reload the built main.js, verify the
-new mark around cm-blockid, Live Preview invisibility, Source visibility, ordinary
-anchors, and reference clicks/exact highlights. Current branch remains
-codex/live-preview-click-interception; no merge to main.
-
-
-## Backlinks display cleanup
-
-User confirms the core workflow and Live Preview marker/block-ID hiding work.
-Remaining reported leak is Backlinks/linked mentions. A dedicated DOM observer now
-wraps complete legacy and HTML metadata text in hidden spans only within Backlinks
-snippets. Text content, link identity/handlers and real DOM comments survive.
-No Markdown, store, navigation, click or highlighting implementation changed.
-Source/editor content is excluded. Existing and newly rendered/edited snippets are
-processed; cleanup disconnects during its own writes and restores spans on unload.
-
-Private DOM selectors are isolated in src/backlinks-cleanup.ts. Their compatibility
-is not established by unit tests. Truncated markers and separate pop-out documents
-remain unsupported. Logs report hidden span counts only behind the debug flag.
-Added jsdom as a development-only dependency for actual DOM/observer fixture tests.
-
-Validation: 57 tests pass, typecheck/build pass, diff check passes. Tests cover split
-markers, computed display, event/element preservation, scope exclusions, ordinary
-comments, result replacement, reuse of hidden text nodes and unload restoration.
-Runtime acceptance remains: install/reload, inspect sidebar and embedded backlinks,
-expand/collapse/filter/update results, confirm raw Source and both click/highlight
-paths, then disable plugin and confirm restoration. No new Obsidian UI run here.
-
-UI_PROPOSAL.md contains unimplemented reference appearance, hover/focus information,
-and settings ideas. Next step is real Backlinks validation and proposal review;
-no merge is authorized or performed.
-
-
-## Backlinks pane/row repair after DOM investigation
-
-User confirmed .backlink-pane > .search-result-container >
-.search-result-file-match > .search-result-file-matched-text and reported markers
-still visible in 54aa199. Replace snippet-only handling with full result-row
-handling scoped strictly to .backlink-pane. Each pane has a MutationObserver for
-child, text and class updates; a discovery observer manages added/replaced panes.
-Conceal complete legacy/HTML markers and generated ^sr-xxxxxxxx tokens, including
-visible link fragments, without changing hrefs, textContent or native handlers.
-Normal IDs and unrelated comments remain visible; Source/Live Preview untouched.
-
-Debug-only cleanup logs include reason, matchedNodesCount (processed result rows),
-and hiddenMarkerCount (tokens, independent of split wrapper count), even when zero.
-59 tests, typecheck, build and diff checks pass. Realistic fixtures cover note-open,
-delayed text updates, switching notes, pane replacement, ordinary-token exclusions
-and preserved click handlers/targets. This is automated DOM validation, not a real
-Obsidian navigation run. Next: reload the plugin, open/switch notes, inspect the
-Backlinks panel and verify navigation/exact highlighting in the Vault.
-
-Three pre-existing untracked files (.search-result-container,
-.search-result-file-match, .search-result-file-matched-text) were left untouched
-and excluded from the commit. No merge to main.
-
-
-## Persistent Backlinks cleanup lifecycle
-
-User verified initial note-open concealment, but markers reappeared after clicking
-a backlink. The exact runtime mutation sequence is not available locally. Replace
-pane observer registration/disconnection and affected-row inference with one
-persistent observer on the stable UI root. On each render mutation batch, rescan
-current .backlink-pane result rows using the unchanged concealment logic. Observe
-childList/subtree, text, and relevant visibility/class attributes. Drain synchronous
-cleanup records rather than disconnecting, so subsequent asynchronous rendering
-remains observed. Disconnect only on unload and restore hidden wrappers.
-
-Debug-only logs now include observer-trigger mutation count, cleanup reason,
-nodesScanned and markersHidden. No Markdown/store/navigation/highlighting/Live
-Preview changes. 61 tests, typecheck, build and diff checks pass. Tests reproduce
-click-triggered pane replacement and repeated refreshes, assert zero disconnects
-until unload, and verify no self-generated cleanup loop. Real Vault validation
-remains: open/switch notes, click backlinks repeatedly, refresh pane, verify hidden
-markers and unchanged navigation/highlighting. Private DOM and main-document
-limitations remain. Existing three untracked investigation files remain untouched.
-
-
-## Live Preview block-token repair (current task)
-
-User clarified that Reading View and Backlinks issues are solved. The remaining
-issue is Live Preview cm-blockid spans showing generated anchors. No changes to
-Backlinks, Reading View, click interception, navigation, or highlight code here.
-
-Broaden Live Preview's reserved format from eight hex digits to ^sr-[a-z0-9]+.
-Mark decorations now carry inline display:none!important instead of relying on a
-base theme. A CM6 ViewPlugin measures actual cm-blockid spans after rendering,
-validates posAtDOM against current source, and adds missing decoration ranges via
-a StateEffect. Dispatch runs in a microtask after CM's measure phase, with state,
-mode and disposal guards. Source mode clears concealment; no editor DOM mutation.
-Debug-only logs report matchedCmBlockidTokens, hiddenDecorationCount and pending
-counts. Ordinary user IDs outside the reserved format remain visible.
-
-63 tests, typecheck/build and diff check pass. Added actual CM6 EditorView/jsdom
-coverage with cm-blockid decorations, Source toggling and exact-highlight marks;
-token mapping tests reject stale/unmappable or non-reserved tokens. Existing refId
-and locator tests remain green. This is not a real Obsidian UI run. Next: install
-the build, verify Live Preview hides anchors, Source shows them, and Smart Reference
-clicks still navigate/highlight. If needed enable SMART_REFERENCE_DEBUG and capture
-token/decoration counts. Existing three untracked files remain untouched.
-
-
-## Backlinks-only clarification and workspace attachment
-
-User corrected the scope: the visible metadata is in Backlinks (“链接当前文件”),
-not Live Preview. Preserve 95ee7b9's CM6 changes unchanged. Existing tests already
-hide the supplied literal examples under the known selectors; the remaining Vault
-failure has not been reproduced from the available information. Requested affected
-row outerHTML/window location to distinguish missing observer scope from rendering.
-
-Addressed a concrete attachment limitation: setup previously observed only the
-original main document.body. A Backlinks-only manager now attaches above each
-workspace document's body, refreshes on file-open/active-leaf/layout changes, and
-attaches/detaches on window-open/close. DOM observers still cover delayed renders.
-The cleanup matcher is unchanged. Debug output includes matchedBacklinkRows,
-hiddenMarkerCount, panesFound and rootConnected; no editor/navigation changes.
-
-64 tests, typecheck, build and diff check pass. New regression covers secondary
-documents, body replacement, explicit workspace refresh, detach and unload; prior
-rerender/click/Source/CM6 tests pass. Real-Vault resolution remains unconfirmed.
-Next: reload and inspect Backlinks after opening/clicking/switching files. If markers
-remain, collect the affected row outerHTML and debug counts; do not infer another
-editor defect. Pre-existing untracked investigation files remain untouched.
-
-
-## Current Backlinks pane-identity lifecycle repair
-
-User confirmed cleanup works initially but markers reappear after file switching.
-Keep all marker matching/concealment code unchanged. Each document now maintains
-a discovery observer and a registry keyed by actual .backlink-pane elements, with
-one content observer per current pane. Workspace refresh reconciles live identities,
-disconnects stale panes, attaches/cleans replacements and refreshes retained panes.
-Discovery catches asynchronous replacements that arrive after the event. Content
-cleanup drains its synchronous records without disconnecting its pane observer.
-
-file-open, active-leaf-change and layout-change now pass their names into diagnostics.
-Debug logs show workspace event, attached target element, disconnected target,
-matched row count and hidden marker count. No CM6, Reading View, navigation,
-highlighting, storage or marker regex changes.
-
-65 tests, typecheck/build and diff check pass. Instrumented observer tests confirm
-stale-target disconnection and exactly one observer on each new pane after all three
-workspace events, including delayed recreation and unload. Real Obsidian validation
-remains: switch files/activate leaves/change layout and confirm marker concealment
-and navigation. Existing three untracked investigation files remain untouched.
-
-
-## Current task: partially cleaned Backlinks rows — diagnostics first
-
-User reports mixed success across rows; explicitly preserve observer lifecycle.
-Added SMART_REFERENCE_DEBUG-gated before/after serializable row snapshots:
-outerHTML, child nodes, all text nodes/offsets/parent HTML, actual comment nodes,
-matched marker types/ranges, unmatched candidate prefixes, skip reason and hidden
-marker count. Snapshot collection is disabled when debugging is off. Lifecycle,
-CM6, navigation, highlighting, Reading View and marker regex semantics are unchanged.
-
-67 tests, typecheck/build and diff check pass. The literal examples supplied by the
-user all match, including markers split among nested spans. Other diagnostics tests
-cover actual invisible comment nodes, incomplete/entity-encoded text and editor-guard
-skips. These are diagnostic distinctions, NOT a confirmed root cause in the Vault.
-No speculative matcher fix was applied. The requested minimal fix is pending actual
-failing-row evidence. Asked for row outerHTML; none has been supplied yet.
-
-Next: enable SMART_REFERENCE_DEBUG in src/debug.ts, rebuild/reload, reproduce mixed
-rows, copy [Smart Reference] Backlinks row diagnostic before/after payloads for a
-failure and a success. Use the actual shape to add a failing test and the minimal
-fix, keeping lifecycle unchanged. Existing untracked investigation files untouched.
-
-
-## Live Preview metadata comment concealment
-
-User confirmed generated block IDs hide but reserved HTML/percent markers remain
-visible. The existing field used inline-styled marks for block IDs but replacement
-decorations for comments. Reuse the working inline-styled mark mechanism for both
-<!--smart-ref:id--> and %%ref:id%%. Keep the same reserved marker recognition,
-Live Preview gate and atomic ranges; ordinary comments, user percent content and
-pending placeholders stay untouched. Source mode removes all hiding decorations.
-No navigation, highlighting, Backlinks, Reading View or debug-switch changes.
-
-67 tests, typecheck, build and diff check pass. Expanded the actual CM6 DOM fixture
-with the reported UUID marker forms plus ordinary comments. It checks computed
-hidden display for all three formats, unchanged raw source, Source-mode reveal and
-coexisting exact highlights. Real Obsidian validation remains: reload, inspect both
-metadata formats in Live Preview/Source, and click a reference to verify navigation
-and exact highlighting. Existing untracked investigation files remain untouched.
+Native fallback, ambiguous rendering, embedded-note source association, complex
+Markdown and the private `editor.cm` bridge remain the main compatibility limits.
+Backlinks cleanup depends on Obsidian's private DOM. No merge or release action
+has been taken. Historical implementation decisions are in `docs/DECISIONS.md`;
+broader roadmap work remains in `docs/TASKS.md`.

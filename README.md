@@ -4,7 +4,8 @@ Create native Wiki Block Links that return to the exact selected source text.
 The full Smart Reference workflow has been verified in real Obsidian: Reading
 View click resolution and exact DOM Range highlighting, plus Live Preview span
 click interception, refId resolution, navigation and CodeMirror exact highlighting.
-This feature is prepared for integration; it has not been merged into main.
+The branch is ready for integration review. Recent metadata concealment changes
+still need a final check in a real Obsidian Vault. It has not been merged into main.
 
 ## Development and installation
 
@@ -102,9 +103,9 @@ editor highlighting works when the existing navigation/command opens that target
 
 ### Backlinks display
 
-A persistent UI-root MutationObserver reapplies cleanup for complete `%%ref:id%%`, `<!--smart-ref:id-->`
-and generated `^sr-xxxxxxxx` text tokens within `.backlink-pane
-.search-result-file-match` rows. The full row is scanned, including nested
+A document-level discovery observer and pane observers clean complete
+`%%ref:id%%`, `<!--smart-ref:id-->` and generated `^sr-xxxxxxxx` text
+tokens within `.backlink-pane .search-result-file-match` rows. The full row is scanned, including nested
 `.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
 textContent, link elements, href attributes and native handlers; no Markdown or
 metadata is rewritten. Split tokens and delayed text updates are supported.
@@ -116,31 +117,27 @@ arrive after the workspace event. Content observers remain connected during clea
 plugin-generated mutations do not trigger a cleanup loop. Unload disconnects all
 observers and removes wrappers; Source and Live Preview are unchanged.
 
-This depends on private Obsidian Backlinks DOM. The confirmed hierarchy is
+This depends on Obsidian’s private Backlinks DOM. The confirmed hierarchy is
 `.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
 `.search-result-file-matched-text`. Other layouts, global search and truncated markers
-are not covered. Workspace pop-out documents use the same scoped cleanup. Debug logging reports cleanup
-workspace event names, actual observer attachment/disconnection targets,
-`matchedBacklinkRows`, and `hiddenMarkerCount` (complete tokens, not wrapper spans), including zero-match runs.
-For partially cleaned rows, enable `SMART_REFERENCE_DEBUG` and filter for
-`Backlinks row diagnostic`. Before/after snapshots include outerHTML, child/text
-nodes, actual DOM comments, matched types/ranges, unmatched prefixes and skip
-reasons. These logs include note contents. Copy a failing row's before/after entries
-to diagnose its DOM shape; supplied literal markers already match in fixture tests.
-Real Vault validation remains pending for this repair.
+are not covered. Workspace pop-out documents use the same scoped cleanup.
+Optional debug logs report workspace events, observer attachment and disconnection,
+matched row counts and hidden marker counts.
+For Backlinks troubleshooting, enable the runtime debug switch and inspect
+`Backlinks cleanup` counts. If a row still leaks, capture its DOM from the Vault;
+the large temporary row snapshots have been removed from normal builds.
 
 Future appearance, hover/focus and settings ideas are in
 [the UI proposal](docs/UI_PROPOSAL.md); these are not implemented settings.
 
 ## Diagnostics
 
-Normal builds are quiet. For troubleshooting, set `SMART_REFERENCE_DEBUG` to `true`
-in `src/debug.ts`, rebuild and reload the plugin, then filter the developer console
-for `[Smart Reference]`. Restore `false` before integration/release builds.
-
-Logs include click resolution path, locator result, container/range mapping,
-decoration application and fallback reasons. Debug output includes note text and
-reference context. There is no new setting or stored metadata field.
+Normal builds are quiet. To turn on optional diagnostics in Obsidian's developer
+console, run `localStorage.setItem("SMART_REFERENCE_DEBUG", "true")`. To turn them
+off, run `localStorage.removeItem("SMART_REFERENCE_DEBUG")`. The switch is read at
+runtime; a rebuild is unnecessary. Logs include click resolution, highlight result
+and fallback reason, decoration counts and Backlinks observer activity. They may
+include note paths or reference identifiers, so leave the switch off normally.
 
 ## Known limitations
 

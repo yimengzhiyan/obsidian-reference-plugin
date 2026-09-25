@@ -443,7 +443,6 @@ export default class ReferencePlugin extends Plugin {
         target,
         sourcePath: view.file?.path ?? null,
         sourceOffset: offset,
-        sourceLine: line,
         targetOrdinal: ordinal,
         renderedTargetCount: renderedMatches.length,
       }]);

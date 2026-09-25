@@ -49,8 +49,6 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
     ).range(match.index!, match.index! + match[0].length));
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", {
       count: ranges.length,
-      blockIds: ranges.filter((range) => range.value.spec.class === "smart-ref-hidden-block-id")
-        .map((range) => state.doc.sliceString(range.from, range.to)),
       hiddenBlockIdCount: ranges.filter((range) => range.value.spec.class === "smart-ref-hidden-block-id").length,
     }]);
     return Decoration.set(ranges);
@@ -104,7 +102,7 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
               });
             }
             debugLog(() => ["[Smart Reference] Live Preview block-id tokens", {
-              matchedCmBlockidTokens: tokens,
+              matchedCmBlockidTokenCount: tokens.length,
               hiddenDecorationCount: tokens.length - missing.length,
               pendingDecorationCount: missing.length,
             }]);

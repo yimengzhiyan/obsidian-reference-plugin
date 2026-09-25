@@ -4,17 +4,19 @@
 
 ## Current integration checkpoint
 
-- [x] User-verified Reading View click resolution and exact DOM Range highlighting
-- [x] User-verified Live Preview span click/refId resolution/navigation/exact CM6 decoration
-- [x] Review accumulated functional fixes and retain behavior
-- [x] Gate temporary diagnostics behind a disabled-by-default lazy debug logger
-- [x] Document architectures and known limitations in README/current status/decisions
-- [x] Run tests, typecheck, build and diff checks
-- [ ] Integration review and explicit authorization before merging main
+- [x] Review commits and retain validated creation/navigation/highlight fixes
+- [x] Remove temporary row snapshots and excessive text diagnostics
+- [x] Keep opt-in runtime `SMART_REFERENCE_DEBUG` logging
+- [x] Delete the three empty untracked Backlinks investigation files
+- [x] Update README and current handoff status
+- [x] Confirm final test, typecheck, build and diff checks (65 tests)
+- [ ] Real Obsidian: verify Live Preview hides both marker formats and Source shows raw Markdown
+- [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
+- [ ] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
+- [ ] Review integration branch; merge only with explicit authorization
 
-Historical milestone checklists below retain broader unverified edge cases; the
-core end-to-end milestone above is complete.
-
+Historical milestone checklists below record work at the time and may contain
+superseded runtime observations. Use the current checkpoint above for next actions.
 
 每个 milestone 应尽量形成可独立 review 的 commit / PR。
 

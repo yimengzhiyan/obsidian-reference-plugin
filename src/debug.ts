@@ -1,9 +1,3 @@
-/**
- * Compatibility guard for existing callers. Keep browser diagnostics reachable;
- * the actual user switch is checked by debugLog on every call, not at build time.
- */
-export let SMART_REFERENCE_DEBUG = typeof window !== "undefined";
-
 /** Lazy payloads avoid collecting note text or forcing layout while disabled. */
 export function debugLog(details: () => readonly unknown[]): void {
   try {

@@ -1,8 +1,8 @@
 import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
-import { concealBacklinkMatch, inspectBacklinkRow, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
+import { concealBacklinkMatch, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField, renderedBlockTokenRanges } from "../src/metadata-hiding.ts";
-import { debugLog, SMART_REFERENCE_DEBUG } from "../src/debug.ts";
+import { debugLog } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
 import { toEditorHighlightRange } from "../src/editor-range.ts";
@@ -546,11 +546,34 @@ test("Live Preview ordinary links never borrow a neighboring Smart Reference", (
 });
 
 
-test("integration builds disable diagnostics without evaluating note-text payloads", () => {
-  assert.equal(SMART_REFERENCE_DEBUG, false);
+test("diagnostics require the runtime switch and evaluate payloads lazily", () => {
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const originalDebug = console.debug;
+  let enabled = false;
   let evaluated = false;
-  debugLog(() => { evaluated = true; return ["private note text"]; });
-  assert.equal(evaluated, false);
+  const messages: unknown[][] = [];
+  try {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => enabled ? "true" : null },
+    });
+    console.debug = (...args) => { messages.push(args); };
+    debugLog(() => { evaluated = true; return ["private note text"]; });
+    assert.equal(evaluated, false);
+    enabled = true;
+    debugLog(() => { evaluated = true; return ["runtime diagnostic"]; });
+    assert.equal(evaluated, true);
+    assert.deepEqual(messages, [["runtime diagnostic"]]);
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get: () => { throw new Error("storage unavailable"); },
+    });
+    debugLog(() => { throw new Error("payload must stay lazy"); });
+  } finally {
+    console.debug = originalDebug;
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
 });
 
 
@@ -987,39 +1010,4 @@ test("workspace refresh rebinds observers to new pane identities before and afte
   manager.destroy();
   assert.equal(attached.size, 0);
   window.close();
-});
-
-
-test("Backlinks row diagnostics identify all reported literal markers across text nodes", () => {
-  const { document } = backlinksFixture();
-  const row = document.querySelector('.search-result-file-match')!;
-  row.innerHTML = '[[Target#^sr-f3f81c62|科伊村]] &lt;!--smart-<span>ref:e54d2638-1898-4422-b8b7-fcf864132fae</span>--&gt; %%<b>ref:uuid</b>%%';
-  const diagnostic = inspectBacklinkRow(row);
-  const originalHTML = row.outerHTML;
-  assert.equal(diagnostic.outerHTML, originalHTML);
-  assert.equal(diagnostic.childNodes.length, row.childNodes.length);
-  assert.equal(diagnostic.textNodes.map((node) => node.text).join(''), row.textContent);
-  assert.deepEqual(diagnostic.matchedMarkerTypes, ['^sr-', '<!--smart-ref-->', '%%ref:']);
-  assert.equal(diagnostic.matches.length, 3);
-  assert.deepEqual(diagnostic.unmatchedMarkerCandidates, []);
-  assert.equal(diagnostic.skipReason, null);
-  assert.equal(concealBacklinkMatch(row), 3);
-  assert.equal(visibleSnippetText(row), '[[Target#|科伊村]]  ');
-  assert.equal(diagnostic.outerHTML, originalHTML, 'snapshot must not become live DOM');
-  assert.ok(inspectBacklinkRow(row).textNodes.some((node) => node.hiddenByPlugin));
-});
-
-test("Backlinks diagnostics distinguish invisible comments, unmatched text and skipped rows", () => {
-  const { document } = backlinksFixture();
-  const row = document.querySelector('.search-result-file-match')!;
-  row.innerHTML = '<!--smart-ref:actual-comment--> %%ref:partial &amp;lt;!--smart-ref:encoded--&amp;gt; ^sr-short';
-  const diagnostic = inspectBacklinkRow(row);
-  assert.equal(diagnostic.commentNodes[0]?.text, 'smart-ref:actual-comment');
-  assert.equal(diagnostic.childNodes[0]?.nodeType, 8);
-  assert.equal(diagnostic.matches.length, 0);
-  assert.equal(diagnostic.unmatchedMarkerCandidates.length, 3);
-  const parent = row.closest('.backlink-pane')!;
-  parent.classList.add('cm-editor');
-  assert.equal(inspectBacklinkRow(row).skipReason, 'inside-cm-editor');
-  assert.equal(concealBacklinkMatch(row), 0);
 });
