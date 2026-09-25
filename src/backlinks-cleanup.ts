@@ -11,9 +11,31 @@ function reveal(root: Element): void {
   });
 }
 
-const markerMatches = (text: string) => Array.from(text.matchAll(
-  /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->|(?<![A-Za-z0-9_])\^sr-[0-9a-f]{8}(?![A-Za-z0-9_-])/g,
-));
+type HiddenTextRange = { from: number; to: number };
+
+function hiddenTextRanges(text: string): HiddenTextRange[] {
+  const ranges: HiddenTextRange[] = [];
+  const wikiLinks = Array.from(text.matchAll(/\[\[[^\]\n]+\]\]/g));
+
+  for (const match of text.matchAll(/\[\[[^\]\n|]+#\^sr-[a-z0-9]+\|[^\]\n]*\]\]/g)) {
+    const from = match.index!;
+    const separator = match[0].indexOf("|");
+    ranges.push({ from, to: from + separator + 1 });
+    ranges.push({ from: from + match[0].length - 2, to: from + match[0].length });
+  }
+
+  for (const match of text.matchAll(/%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->/g)) {
+    ranges.push({ from: match.index!, to: match.index! + match[0].length });
+  }
+
+  for (const match of text.matchAll(/(?<![A-Za-z0-9_])\^sr-[0-9a-f]{8}(?![A-Za-z0-9_-])/g)) {
+    const from = match.index!;
+    if (wikiLinks.some((link) => from >= link.index! && from < link.index! + link[0].length)) continue;
+    ranges.push({ from, to: from + match[0].length });
+  }
+
+  return ranges.sort((left, right) => left.from - right.from || left.to - right.to);
+}
 const skipReason = (row: Element) => !row.matches(MATCH) ? "not-backlink-row"
   : !row.closest(PANE) ? "outside-backlink-pane"
   : row.closest(".cm-editor") ? "inside-cm-editor" : null;
@@ -30,12 +52,10 @@ export function concealBacklinkMatch(snippet: Element): number {
     text += node.textContent ?? "";
     nodes.push({ node: node as Text, from, to: text.length });
   }
-  const matches = markerMatches(text);
+  const ranges = hiddenTextRanges(text);
   let count = 0;
   // Work backwards so splitting a Text node cannot invalidate earlier offsets.
-  for (const match of matches.reverse()) {
-    const start = match.index!;
-    const end = start + match[0].length;
+  for (const { from: start, to: end } of ranges.reverse()) {
     let hidden = false;
     for (const { node, from, to } of [...nodes].reverse()) {
       if (to <= start || from >= end || node.parentElement?.closest(`.${HIDDEN}`)) continue;

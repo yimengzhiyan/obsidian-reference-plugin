@@ -972,3 +972,14 @@ ref marker and a generated `#^sr-[a-z0-9]+` destination may replace rendered anc
 text with its source alias. Keep normal links and ambiguous associations unchanged.
 This is a postprocessor display correction; it does not change Markdown, click
 resolution, navigation, Live Preview decorations or exact highlighting.
+
+
+## D-055 — Collapse raw Smart Reference Wiki Links to aliases in Backlinks
+
+Backlinks may display raw `[[Target#^sr-id|alias]]` text rather than a rendered
+anchor. Hiding only `^sr-id` leaves the broken presentation `[[Target#|alias]]`.
+Within the existing Backlinks row cleanup, identify the reserved generated Wiki
+Link form and conceal its opening syntax and closing brackets, leaving its alias
+visible. Use the existing reversible text wrappers so enclosing anchors, hrefs and
+handlers survive when present. Do not transform ordinary Wiki Links. Markdown,
+Reading View, Live Preview, navigation and highlighting remain unchanged.

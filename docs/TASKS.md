@@ -14,6 +14,8 @@
 - [x] Test `#^sr-` link fragments, both marker formats, Source mode and exact highlights
 - [x] Restore generated Smart Reference aliases in Reading View without rewriting normal links
 - [ ] Real Obsidian: verify Reading View shows the alias instead of the internal target
+- [x] Render raw Smart Reference Wiki Links as aliases in Backlinks while preserving anchors
+- [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
 - [ ] Real Obsidian: confirm Reading View and Live Preview exact highlight regression

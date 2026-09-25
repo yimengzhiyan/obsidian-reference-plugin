@@ -40,6 +40,12 @@
 
 ## Backlinks display status
 
+- Runtime diagnostics confirmed the observer cleans current rows and metadata
+  markers, but hiding only the generated block token left broken display text such
+  as `[[Target#|alias]]`. Backlinks cleanup now recognizes the complete generated
+  Wiki Link and hides its opening syntax and closing brackets, leaving only alias.
+- The correction uses the existing hidden text wrappers, preserving any enclosing
+  anchor, href and event handlers. Ordinary Wiki Links remain unchanged.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
   file, leaf and layout changes. Users reported that some rows remained visible
   after earlier repairs. The literal reported markers match in DOM fixtures, but
@@ -62,7 +68,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 66 passed
+- `npm test`: 68 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
@@ -73,6 +79,8 @@ for Backlinks selectors were deleted.
 - Real Vault: validate Backlinks after opening, switching and clicking notes. If a
   row still leaks, enable debug logging and inspect that row's actual DOM before
   changing the matcher.
+- Real Vault: confirm generated Backlinks Wiki Links display only their aliases and
+  retain native backlink interaction.
 - Real Vault: smoke-test navigation and exact highlighting in both views.
 
 Native fallback, ambiguous rendering, embedded-note source association, complex
