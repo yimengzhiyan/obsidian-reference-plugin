@@ -110,7 +110,19 @@ export function concealBacklinkMatch(row: Element): number {
   const matchedTextSpans = Array.from(row.querySelectorAll(MATCHED_TEXT))
     .filter((span) => span.closest(MATCH) === row);
   for (const span of matchedTextSpans) {
-    count += concealRanges(span, smartReferenceLinkRanges(span.textContent ?? ""));
+    const textContent = span.textContent ?? "";
+    const pattern = /\[\[[^\]]*#\^sr-[a-z0-9]+\|([^\]]*)\]\]/g;
+    const matched = pattern.test(textContent);
+    pattern.lastIndex = 0;
+    const replaced = textContent.replace(pattern, "$1");
+    console.log("[Smart Reference] Backlinks matched text debug", {
+      count: matchedTextSpans.length,
+      innerText: (span as HTMLElement).innerText,
+      textContent,
+      matched,
+      replaced,
+    });
+    count += concealRanges(span, smartReferenceLinkRanges(textContent));
   }
   // Metadata may be rendered in sibling spans outside the matched-text span.
   // Scan the row for those complete reserved tokens only; Wiki Link display
