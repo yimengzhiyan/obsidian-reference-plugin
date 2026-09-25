@@ -591,7 +591,7 @@ test("metadata hiding follows Live Preview/Source switches and current edits", (
   assert.equal(state.field(hiding).size, 0);
 });
 
-test("metadata replacement coexists with exact editor marks and defaults to visible without mode field", () => {
+test("metadata concealment coexists with exact editor marks and defaults to visible without mode field", () => {
   const hiding = createMetadataHidingField(testLivePreviewField);
   const source = "chosen words <!--smart-ref:uuid-->";
   let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding, preciseHighlightField] });
@@ -647,7 +647,7 @@ test("generated anchors use token-compatible marks and rebuild after anchor edit
   });
   assert.deepEqual(specs, [
     { text: "^sr-fa1b9d4b", className: "smart-ref-hidden-block-id" },
-    { text: "%%ref:legacy%%", className: undefined },
+    { text: "%%ref:legacy%%", className: "smart-ref-hidden-metadata" },
   ]);
   // Editing the reserved prefix reveals a normal user anchor immediately.
   state = state.update({ changes: { from: 6, to: 8, insert: "my" } }).state;
@@ -853,7 +853,7 @@ test("Live Preview maps only reserved cm-blockid syntax tokens to current source
   assert.deepEqual(renderedBlockTokenRanges({ ...bridge, posAtDOM: () => { throw new Error('stale token'); } }), []);
 });
 
-test("CM6 renders hidden block-token decorations and reveals Source without losing exact marks", async () => {
+test("CM6 hides all three reserved marker formats and reveals Source without losing exact marks", async () => {
   const dom = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
   const globals = ['window', 'document', 'MutationObserver', 'Window', 'HTMLElement', 'Node', 'getComputedStyle'];
   const saved = globals.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
@@ -863,7 +863,10 @@ test("CM6 renders hidden block-token decorations and reveals Source without losi
   // jsdom has no layout engine; CM only needs empty rectangles for this fixture.
   dom.window.Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
   dom.window.Range.prototype.getBoundingClientRect = () => new dom.window.DOMRect();
-  const source = 'chosen words ^sr-az09 suffix\nNormal ^user-id';
+  const htmlMarker = '<!--smart-ref:54d2638-1898-4422-b8b7-fcf864132fae-->';
+  const legacyMarker = '%%ref:e4d301ec-f22b-443a-8e45-3b2f7c30ef7c%%';
+  const ordinary = '<!--ordinary comment--> %%user content%%';
+  const source = `chosen words ^sr-az09 suffix\nNormal ^user-id\n${htmlMarker} ${legacyMarker} ${ordinary}`;
   const anchorFrom = source.indexOf('^sr-');
   const userFrom = source.indexOf('^user-');
   const errors: unknown[] = [];
@@ -876,14 +879,23 @@ test("CM6 renders hidden block-token decorations and reveals Source without losi
         EditorView.exceptionSink.of((error) => errors.push(error)),
         EditorView.decorations.of(Decoration.set([
           Decoration.mark({ class: 'cm-blockid' }).range(anchorFrom, anchorFrom + 8),
-          Decoration.mark({ class: 'cm-blockid' }).range(userFrom, source.length),
+          Decoration.mark({ class: 'cm-blockid' }).range(userFrom, userFrom + '^user-id'.length),
+          Decoration.mark({ class: 'cm-comment' }).range(source.indexOf(htmlMarker), source.length),
         ])),
       ],
     }) });
     // The fixture's token is not line-ending: only the rendered-token bridge hides it.
     await new Promise((resolve) => setTimeout(resolve, 60));
     assert.deepEqual(errors, []);
-    assert.equal(view.state.field(hiding).size, 1);
+    assert.equal(view.state.field(hiding).size, 3);
+    const metadata = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.smart-ref-hidden-metadata'));
+    assert.deepEqual(metadata.map((node) => node.textContent), [htmlMarker, legacyMarker]);
+    for (const node of metadata) assert.equal(dom.window.getComputedStyle(node).display, 'none');
+    const visible = view.contentDOM.cloneNode(true) as HTMLElement;
+    visible.querySelectorAll('.smart-ref-hidden-metadata, .smart-ref-hidden-block-id').forEach((node) => node.remove());
+    assert.ok(visible.textContent?.includes(ordinary));
+    assert.ok(!visible.textContent?.includes(htmlMarker));
+    assert.ok(!visible.textContent?.includes(legacyMarker));
     const hidden = view.contentDOM.querySelector<HTMLElement>('.smart-ref-hidden-block-id')!;
     assert.equal(hidden.textContent, '^sr-az09');
     assert.equal(dom.window.getComputedStyle(hidden).display, 'none');
@@ -895,8 +907,8 @@ test("CM6 renders hidden block-token decorations and reveals Source without losi
     assert.equal(view.contentDOM.querySelector('.smart-ref-precise-highlight')?.textContent, 'chosen words');
     view.dispatch({ effects: setTestLivePreview.of(false) });
     await new Promise((resolve) => setTimeout(resolve, 30));
-    assert.equal(view.contentDOM.querySelector('.smart-ref-hidden-block-id'), null);
-    assert.equal(view.contentDOM.textContent, source.replace('\n', ''));
+    assert.equal(view.contentDOM.querySelector('.smart-ref-hidden-block-id, .smart-ref-hidden-metadata'), null);
+    assert.equal(view.contentDOM.textContent, source.replace(/\n/g, ''));
     assert.equal(view.state.doc.toString(), source);
     assert.deepEqual(errors, []);
   } finally {

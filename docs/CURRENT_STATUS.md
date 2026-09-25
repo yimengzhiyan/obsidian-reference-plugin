@@ -260,3 +260,21 @@ Next: enable SMART_REFERENCE_DEBUG in src/debug.ts, rebuild/reload, reproduce mi
 rows, copy [Smart Reference] Backlinks row diagnostic before/after payloads for a
 failure and a success. Use the actual shape to add a failing test and the minimal
 fix, keeping lifecycle unchanged. Existing untracked investigation files untouched.
+
+
+## Live Preview metadata comment concealment
+
+User confirmed generated block IDs hide but reserved HTML/percent markers remain
+visible. The existing field used inline-styled marks for block IDs but replacement
+decorations for comments. Reuse the working inline-styled mark mechanism for both
+<!--smart-ref:id--> and %%ref:id%%. Keep the same reserved marker recognition,
+Live Preview gate and atomic ranges; ordinary comments, user percent content and
+pending placeholders stay untouched. Source mode removes all hiding decorations.
+No navigation, highlighting, Backlinks, Reading View or debug-switch changes.
+
+67 tests, typecheck, build and diff check pass. Expanded the actual CM6 DOM fixture
+with the reported UUID marker forms plus ordinary comments. It checks computed
+hidden display for all three formats, unchanged raw source, Source-mode reveal and
+coexisting exact highlights. Real Obsidian validation remains: reload, inspect both
+metadata formats in Live Preview/Source, and click a reference to verify navigation
+and exact highlighting. Existing untracked investigation files remain untouched.

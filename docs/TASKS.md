@@ -806,3 +806,12 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Preserve observer lifecycle and unrelated code; 67 tests/typecheck/build pass
 - [ ] Capture failing real-Vault row diagnostics (actual root cause still unknown)
 - [ ] Reproduce actual missed shape, then implement and test the minimal fix
+
+
+## Live Preview metadata formats
+
+- [x] Use inline-styled CM6 marks for HTML and legacy markers as well as block IDs
+- [x] Keep ordinary comments/user percent content visible and Source unchanged
+- [x] Extend CM6 DOM tests for all three formats and exact-highlight coexistence
+- [x] 67 tests, typecheck/build/diff check pass
+- [ ] Real Obsidian: metadata hidden in Live Preview, raw in Source; reference click intact

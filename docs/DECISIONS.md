@@ -939,3 +939,13 @@ Discovery handles rendering after the event without timeouts. Separate discovery
 from content cleanup so plugin writes do not repeatedly reclean unchanged panes.
 Retain the existing concealment function byte-for-byte. Debug target elements and
 event names make lifecycle verification possible in the real Vault.
+
+
+## D-052 — Reuse inline-styled CM6 marks for reserved metadata comments
+
+Supersede replacement decorations for HTML/legacy ref markers with the same hiding
+style used by the user-verified block-ID marks. Keep a separate metadata class,
+unchanged reserved patterns, Live Preview-only mode gating and atomic ranges.
+Do not mutate editor DOM or Markdown; normal comments and pending placeholders
+remain visible. Test rendered CM6 output, not just state ranges. Obsidian runtime
+confirmation remains required.

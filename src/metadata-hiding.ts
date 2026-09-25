@@ -4,11 +4,12 @@ import { debugLog } from "./debug.ts";
 
 type BlockTokenRange = { from: number; to: number; text: string };
 const addBlockTokenRanges = StateEffect.define<BlockTokenRange[]>();
-const blockMark = () => Decoration.mark({
-  class: "smart-ref-hidden-block-id",
+const hiddenMark = (className: string) => Decoration.mark({
+  class: className,
   attributes: { style: "display: none !important" },
   inclusive: false,
 });
+const blockMark = () => hiddenMark("smart-ref-hidden-block-id");
 
 /** Validate rendered syntax tokens against current source; never mutate CM DOM. */
 export function renderedBlockTokenRanges(
@@ -44,7 +45,7 @@ export function createMetadataHidingField(livePreview: StateField<boolean>): Sta
       // Keep Obsidian's cm-blockid syntax token and style its exact source range.
       // A mark works whether syntax highlighting nests inside or outside it.
       ? blockMark()
-      : Decoration.replace({ inclusive: false })
+      : hiddenMark("smart-ref-hidden-metadata")
     ).range(match.index!, match.index! + match[0].length));
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", {
       count: ranges.length,

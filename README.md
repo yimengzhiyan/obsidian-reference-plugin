@@ -80,8 +80,8 @@ Native clicks are canceled only after those checks pass.
 
 ### Editor decorations
 
-A separate StateField hides complete Smart Reference markers with replacement
-decorations and generated line-ending block anchors with styled mark decorations.
+A separate StateField hides complete Smart Reference markers and generated
+line-ending block anchors with inline-styled CM6 mark decorations.
 The marks carry an inline hiding style. A CM6 view extension also reads rendered
 `cm-blockid` tokens after rendering, validates their current source positions, and
 adds missing marks for the reserved `^sr-[a-z0-9]+` format. It never mutates CM DOM.
