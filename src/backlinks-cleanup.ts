@@ -140,35 +140,53 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   let stopped = false;
   const attachPane = (pane: Element, reason: string): BacklinksCleanup => {
     let disposed = false;
+    let pendingCleanup: number | null = null;
+    let pendingReason = "pane-mutation";
+    const processedRows = new WeakMap<Element, string>();
     const clean = (trigger = "pane-mutation") => {
       if (disposed || stopped || !root.contains(pane)) return;
       const rows = Array.from(pane.querySelectorAll(MATCH))
         .filter((row) => row.closest(PANE) === pane);
       let hiddenMarkerCount = 0;
       for (const row of rows) {
+        if (processedRows.get(row) === row.innerHTML) continue;
         reveal(row);
         hiddenMarkerCount += concealBacklinkMatch(row);
+        processedRows.set(row, row.innerHTML);
       }
       observer.takeRecords();
       debugLog(() => ["[Smart Reference] Backlinks cleanup", {
         reason: trigger, target: pane, matchedBacklinkRows: rows.length, hiddenMarkerCount,
       }]);
     };
-    const observer = new Observer(() => clean());
+    const scheduleSettledCleanup = (trigger: string) => {
+      pendingReason = trigger;
+      if (pendingCleanup !== null) pane.ownerDocument.defaultView!.clearTimeout(pendingCleanup);
+      pendingCleanup = pane.ownerDocument.defaultView!.setTimeout(() => {
+        pendingCleanup = null;
+        clean(`${pendingReason}-settled`);
+      }, 0);
+    };
+    const refresh = (trigger = "workspace-refresh") => {
+      clean(trigger);
+      scheduleSettledCleanup(trigger);
+    };
+    const observer = new Observer(() => refresh("pane-mutation"));
     observer.observe(pane, {
       childList: true, subtree: true, characterData: true,
       attributes: true, attributeFilter: ["class", "hidden", "style"],
     });
     debugLog(() => ["[Smart Reference] Backlinks observer attached", { target: pane, reason }]);
-    clean(reason);
+    refresh(reason);
     const stop = () => {
       if (disposed) return;
       disposed = true;
+      if (pendingCleanup !== null) pane.ownerDocument.defaultView!.clearTimeout(pendingCleanup);
       observer.disconnect();
       reveal(pane);
       debugLog(() => ["[Smart Reference] Backlinks observer disconnected", { target: pane }]);
     };
-    return Object.assign(stop, { refresh: clean });
+    return Object.assign(stop, { refresh });
   };
   const reconcile = (reason: string, refreshExisting: boolean) => {
     if (stopped) return;

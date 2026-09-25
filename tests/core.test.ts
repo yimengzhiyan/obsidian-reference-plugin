@@ -936,6 +936,33 @@ test("Backlinks persistent observer repairs refreshed wrapper visibility without
   stop();
 });
 
+test("Backlinks reapplies cleanup after a later renderer overwrite without looping", async () => {
+  const { document, window } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[Target#^sr-first|first alias]]</span><span>&lt;!--smart-ref:first--&gt;</span></div></div></body></html>');
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const stop = startBacklinksCleanup(document.body);
+  const row = document.querySelector('.search-result-file-match')!;
+  let clicks = 0;
+  row.addEventListener('click', () => clicks++);
+
+  row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-intermediate|intermediate alias]]</span>';
+  queueMicrotask(() => {
+    row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-final|final alias]]</span><span>%%ref:final%%</span>';
+  });
+  await tick();
+  await tick();
+
+  assert.equal(visibleSnippetText(row), 'final alias');
+  row.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  assert.equal(clicks, 1);
+  const wrapper = row.querySelector('.smart-ref-hidden-backlink-metadata');
+  assert.ok(wrapper);
+  await tick();
+  await tick();
+  assert.equal(row.querySelector('.smart-ref-hidden-backlink-metadata'), wrapper,
+    'a settled row must not be rewritten by the cleanup observer');
+  stop();
+});
+
 test("CM6 hides internal-link fragments and metadata while Source and exact marks remain intact", async () => {
   const dom = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
   const globals = ['window', 'document', 'MutationObserver', 'Window', 'HTMLElement', 'Node', 'getComputedStyle'];

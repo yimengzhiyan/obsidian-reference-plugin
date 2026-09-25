@@ -58,11 +58,14 @@
   nodes without replacing `row.textContent`, preserving the tappable row identity,
   listeners and native navigation. Multiple references and syntax split across
   nested highlight spans are covered. Normal Wiki Links remain unchanged.
-- The unconditional full-row log and temporary DOM ownership/rerender snapshots
-  used for diagnosis have been removed. Concise cleanup and lifecycle counts remain
-  available through `SMART_REFERENCE_DEBUG`.
+- The full-row DOM ownership/rerender snapshots used for diagnosis have been
+  removed. The temporary matched-text log remains unconditional for the next Vault
+  check and reports text, regex match and replacement preview.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
-  file, leaf and layout changes, so rebuilt panes and rows are cleaned again.
+  file, leaf and layout changes, so rebuilt panes and rows are cleaned again. Each
+  mutation receives an immediate cleanup plus a debounced settled pass. A WeakMap
+  DOM signature skips unchanged rows, preventing plugin-authored wrappers from
+  causing repeated writes or observer loops.
 
 ## Integration cleanup
 
@@ -80,7 +83,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 71 passed
+- `npm test`: 72 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

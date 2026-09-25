@@ -1030,3 +1030,15 @@ generated IDs over the containing row so sibling markers are hidden. Modify only
 the affected child Text nodes with reversible wrappers; never replace row
 `textContent` or the tappable row. This preserves native row interaction and leaves
 normal Wiki Links unchanged.
+
+
+## D-060 — Recheck Backlinks rows after renderer mutations settle
+
+Obsidian can overwrite a successfully cleaned Backlinks row later in the same
+rendering sequence. Keep the immediate observer cleanup for responsive updates and
+schedule one debounced zero-delay cleanup after each mutation or workspace refresh.
+Record each row's cleaned `innerHTML` in a WeakMap and skip it while unchanged; an
+Obsidian overwrite changes the signature and is cleaned again. Drain mutations
+created by the wrapper operation and cancel pending timers on detach. This preserves
+the tappable row and avoids a self-sustaining MutationObserver loop without changing
+the matched-text parser or marker regexes.
