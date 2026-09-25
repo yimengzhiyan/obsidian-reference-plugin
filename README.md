@@ -40,9 +40,9 @@ four-level reference UI is not implemented.
 [[Target#^block-id|display text]]<!--smart-ref:uuid-->
 ```
 
-The adjacent HTML comment is invisible in Reading View. Live Preview hides both
-HTML markers, legacy `%%ref:id%%` markers, and reserved `^sr-[a-z0-9]+` block
-anchors using editor decorations; Source mode
+The adjacent HTML comment is invisible in Reading View. Live Preview hides the
+`#^sr-[a-z0-9]+` destination fragment inside generated Wiki Links, adjacent HTML
+markers, and legacy `%%ref:id%%` markers using editor decorations. Source mode
 keeps raw Markdown visible. Alias edits do not change
 reference identity. Keep the marker beside the link. Same-line legacy `%%ref:id%%`
 markers remain readable; markers separated into another paragraph require explicit
@@ -81,16 +81,14 @@ Native clicks are canceled only after those checks pass.
 
 ### Editor decorations
 
-A separate StateField hides complete Smart Reference markers and generated
-line-ending block anchors with inline-styled CM6 mark decorations.
-The marks carry an inline hiding style. A CM6 view extension also reads rendered
-`cm-blockid` tokens after rendering, validates their current source positions, and
-adds missing marks for the reserved `^sr-[a-z0-9]+` format. It never mutates CM DOM.
-Ordinary IDs remain visible; manually authored IDs using the reserved format are
-indistinguishable from generated ones. Both strategies apply only when Obsidian's public `editorLivePreviewField` is true. It rebuilds
-on document or mode changes and provides atomic cursor ranges. It never changes
-Markdown or source offsets. Ordinary comments and pending-creation placeholders
-remain untouched. Switch to Source mode to inspect/edit raw markers.
+A separate StateField parses current Markdown and adds inline-styled CM6 marks for
+the `#^sr-[a-z0-9]+` fragment in Wiki Link destinations and for complete Smart
+Reference markers. It does not depend on rendered token class names. Ordinary block
+links, standalone block IDs, comments and pending-creation placeholders remain
+visible. The field applies only when Obsidian's public `editorLivePreviewField` is
+true, rebuilds after document or mode changes, and provides atomic cursor ranges.
+It never changes Markdown or source offsets. Switch to Source mode to inspect or
+edit the raw syntax.
 
 
 For Live Preview/Source editor targets, the locator validates stored offsets,

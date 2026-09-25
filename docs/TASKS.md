@@ -10,7 +10,9 @@
 - [x] Delete the three empty untracked Backlinks investigation files
 - [x] Update README and current handoff status
 - [x] Confirm final test, typecheck, build and diff checks (65 tests)
-- [ ] Real Obsidian: verify Live Preview hides both marker formats and Source shows raw Markdown
+- [x] Replace failed `.cm-blockid` bridge with internal Wiki Link source ranges
+- [x] Test `#^sr-` link fragments, both marker formats, Source mode and exact highlights
+- [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
 - [ ] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
 - [ ] Review integration branch; merge only with explicit authorization

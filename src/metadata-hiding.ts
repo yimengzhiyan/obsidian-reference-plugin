@@ -1,121 +1,81 @@
-import { StateEffect, StateField, type EditorState } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, type DecorationSet } from "@codemirror/view";
+import { StateField, type EditorState } from "@codemirror/state";
+import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { debugLog } from "./debug.ts";
 
-type BlockTokenRange = { from: number; to: number; text: string };
-const addBlockTokenRanges = StateEffect.define<BlockTokenRange[]>();
-const hiddenMark = (className: string) => Decoration.mark({
-  class: className,
-  attributes: { style: "display: none !important" },
-  inclusive: false,
-});
-const blockMark = () => hiddenMark("smart-ref-hidden-block-id");
+export type HiddenSourceRange = {
+  from: number;
+  to: number;
+  kind: "link-block-fragment" | "html-marker" | "legacy-marker";
+};
 
-/** Validate rendered syntax tokens against current source; never mutate CM DOM. */
-export function renderedBlockTokenRanges(
-  view: Pick<EditorView, "contentDOM" | "state" | "posAtDOM">,
-): BlockTokenRange[] {
-  const ranges: BlockTokenRange[] = [];
-  for (const token of view.contentDOM.querySelectorAll(".cm-blockid")) {
-    const raw = token.textContent ?? "";
-    const text = raw.trim();
-    if (!/^\^sr-[a-z0-9]+$/.test(text)) continue;
-    try {
-      const from = view.posAtDOM(token) + raw.indexOf(text);
-      const to = from + text.length;
-      if (from >= 0 && to <= view.state.doc.length && view.state.doc.sliceString(from, to) === text) {
-        ranges.push({ from, to, text });
-      }
-    } catch {
-      // Obsidian can replace a token before the measurement runs. Retry next render.
-    }
+const WIKI_LINK_PATTERN = /\[\[([^\]\n]+)\]\]/g;
+const METADATA_PATTERN = /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->/g;
+
+/** Find Smart Reference syntax from Markdown source, independent of rendered token classes. */
+export function findLivePreviewHiddenRanges(source: string): HiddenSourceRange[] {
+  const ranges: HiddenSourceRange[] = [];
+
+  for (const link of source.matchAll(WIKI_LINK_PATTERN)) {
+    const linktext = link[1];
+    const aliasSeparator = findUnescapedAliasSeparator(linktext);
+    const target = aliasSeparator < 0 ? linktext : linktext.slice(0, aliasSeparator);
+    const fragment = /#\^sr-[a-z0-9]+$/.exec(target);
+    if (!fragment) continue;
+    const from = link.index! + 2 + fragment.index;
+    ranges.push({ from, to: from + fragment[0].length, kind: "link-block-fragment" });
   }
-  return ranges;
+
+  for (const marker of source.matchAll(METADATA_PATTERN)) {
+    ranges.push({
+      from: marker.index!,
+      to: marker.index! + marker[0].length,
+      kind: marker[0].startsWith("<!--") ? "html-marker" : "legacy-marker",
+    });
+  }
+
+  return ranges.sort((left, right) => left.from - right.from || left.to - right.to);
 }
 
 /** Presentation only: offsets and the Markdown document are never modified. */
 export function createMetadataHidingField(livePreview: StateField<boolean>): StateField<DecorationSet> {
   const build = (state: EditorState): DecorationSet => {
     if (state.field(livePreview, false) !== true) return Decoration.none;
-    const ranges = Array.from(state.doc.toString().matchAll(
-      // Reserved generated anchors occur at the end of a line.
-      // Keep arbitrary user block IDs and link fragments visible.
-      /%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->|(?<!\S)\^sr-[a-z0-9]+(?=[ \t]*\r?$)/gm,
-    ), (match) => (match[0].startsWith("^sr-")
-      // Keep Obsidian's cm-blockid syntax token and style its exact source range.
-      // A mark works whether syntax highlighting nests inside or outside it.
-      ? blockMark()
-      : hiddenMark("smart-ref-hidden-metadata")
-    ).range(match.index!, match.index! + match[0].length));
+    const hidden = findLivePreviewHiddenRanges(state.doc.toString());
+    const decorations = hidden.map(({ from, to, kind }) => Decoration.mark({
+      class: `smart-ref-hidden-${kind}`,
+      attributes: { style: "display: none !important" },
+      inclusive: false,
+    }).range(from, to));
     debugLog(() => ["[Smart Reference] Live Preview metadata hidden", {
-      count: ranges.length,
-      hiddenBlockIdCount: ranges.filter((range) => range.value.spec.class === "smart-ref-hidden-block-id").length,
+      hiddenDecorationCount: decorations.length,
+      linkBlockFragmentCount: hidden.filter((range) => range.kind === "link-block-fragment").length,
+      htmlMarkerCount: hidden.filter((range) => range.kind === "html-marker").length,
+      legacyMarkerCount: hidden.filter((range) => range.kind === "legacy-marker").length,
     }]);
-    return Decoration.set(ranges);
+    return Decoration.set(decorations, true);
   };
+
   return StateField.define<DecorationSet>({
     create: build,
     update: (decorations, transaction) => {
       const modeChanged = transaction.startState.field(livePreview, false) !== transaction.state.field(livePreview, false);
-      if (transaction.state.field(livePreview, false) !== true) return Decoration.none;
-      let next = transaction.docChanged || modeChanged ? build(transaction.state) : decorations;
-      for (const effect of transaction.effects) {
-        if (!effect.is(addBlockTokenRanges)) continue;
-        const additions = effect.value.filter(({ from, to, text }) => {
-          if (from < 0 || to > transaction.state.doc.length || transaction.state.doc.sliceString(from, to) !== text) return false;
-          let covered = false;
-          next.between(from, to, (start, end, value) => {
-            if (start === from && end === to && value.spec.class === "smart-ref-hidden-block-id") covered = true;
-          });
-          return !covered;
-        }).map(({ from, to }) => blockMark().range(from, to));
-        next = next.update({ add: additions, sort: true });
-      }
-      return next;
+      return transaction.docChanged || modeChanged ? build(transaction.state) : decorations;
     },
     provide: (field) => [
       EditorView.decorations.from(field),
       EditorView.atomicRanges.of((view) => view.state.field(field)),
-      ViewPlugin.define((view) => {
-        let destroyed = false;
-        const measure = () => view.requestMeasure({
-          key: field,
-          read: () => view.state.field(livePreview, false) === true ? renderedBlockTokenRanges(view) : [],
-          write: (tokens) => {
-            if (destroyed || view.state.field(livePreview, false) !== true) return;
-            const decorations = view.state.field(field);
-            const missing = tokens.filter(({ from, to }) => {
-              let covered = false;
-              decorations.between(from, to, (start, end, value) => {
-                if (start === from && end === to && value.spec.class === "smart-ref-hidden-block-id") covered = true;
-              });
-              return !covered;
-            });
-            if (missing.length) {
-              const measuredState = view.state;
-              // CM forbids dispatch during its measure/write phase. Apply after it
-              // ends, only if these offsets still belong to the same editor state.
-              queueMicrotask(() => {
-                if (!destroyed && view.state === measuredState && view.state.field(livePreview, false) === true) {
-                  view.dispatch({ effects: addBlockTokenRanges.of(missing) });
-                }
-              });
-            }
-            debugLog(() => ["[Smart Reference] Live Preview block-id tokens", {
-              matchedCmBlockidTokenCount: tokens.length,
-              hiddenDecorationCount: tokens.length - missing.length,
-              pendingDecorationCount: missing.length,
-            }]);
-          },
-        });
-        measure();
-        return {
-          // Runs after CM has updated its syntax-token DOM, including viewport changes.
-          docViewUpdate: measure,
-          update: measure,
-          destroy: () => { destroyed = true; },
-        };
-      }),
     ],
   });
+}
+
+function findUnescapedAliasSeparator(linktext: string): number {
+  for (let index = 0; index < linktext.length; index += 1) {
+    if (linktext[index] !== "|") continue;
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && linktext[cursor] === "\\"; cursor -= 1) {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) return index;
+  }
+  return -1;
 }

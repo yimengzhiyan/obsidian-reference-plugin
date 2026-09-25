@@ -949,3 +949,15 @@ unchanged reserved patterns, Live Preview-only mode gating and atomic ranges.
 Do not mutate editor DOM or Markdown; normal comments and pending placeholders
 remain visible. Test rendered CM6 output, not just state ranges. Obsidian runtime
 confirmation remains required.
+
+
+## D-053 — Derive Live Preview concealment from Wiki Link source ranges
+
+Runtime inspection found zero `.cm-blockid` elements; generated references render
+as `.cm-hmd-internal-link.cm-link-alias`. Supersede D-049's rendered block-token
+bridge. Parse current Markdown and decorate only a generated `#^sr-[a-z0-9]+`
+fragment at the end of a Wiki Link destination, plus complete HTML and legacy ref
+markers. Do not query editor DOM or dispatch supplemental token ranges. Gate the
+field with `editorLivePreviewField`, preserving raw Source mode, click association,
+exact highlight decorations and the Reading View path. Standalone IDs and ordinary
+block-link fragments remain visible.

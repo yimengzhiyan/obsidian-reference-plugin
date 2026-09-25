@@ -13,12 +13,22 @@
 - Source mode retains raw Markdown. Plugin metadata and generated anchors remain
   in the source for native block-link navigation.
 
-## Recent display changes that still need a Vault check
+## Current Live Preview concealment repair
 
-- Live Preview uses CM6 marks to conceal generated `^sr-` anchors, adjacent
-  `<!--smart-ref:id-->` markers and legacy `%%ref:id%%` markers. The last change
-  switched both marker formats to styled marks. Its tests pass; no subsequent
-  real-Obsidian result has been supplied.
+- Runtime evidence showed there are no `.cm-blockid` nodes for these references;
+  aliases render as `.cm-hmd-internal-link.cm-link-alias`. Removed the DOM query,
+  `posAtDOM`, measure callback and supplemental StateEffect path.
+- Live Preview now derives CM6 ranges from current Markdown. It hides only the
+  `#^sr-[a-z0-9]+` fragment inside a Wiki Link destination, complete adjacent
+  `<!--smart-ref:id-->` markers and legacy `%%ref:id%%` markers. Standalone block
+  IDs and ordinary block-link destinations remain visible. Source mode has no
+  concealment ranges.
+- The CM6 DOM fixture models alias internal-link spans and confirms exact source
+  ranges, visible ordinary syntax, Source-mode restoration, click association and
+  exact-highlight coexistence. Real-Obsidian validation is still required.
+
+## Backlinks display status
+
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
   file, leaf and layout changes. Users reported that some rows remained visible
   after earlier repairs. The literal reported markers match in DOM fixtures, but
@@ -41,11 +51,12 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 65 passed
+- `npm test`: 64 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
-- Real Vault: validate Live Preview metadata concealment and Source visibility.
+- Real Vault: validate internal-link fragment and metadata concealment in Live
+  Preview, plus raw syntax in Source mode.
 - Real Vault: validate Backlinks after opening, switching and clicking notes. If a
   row still leaks, enable debug logging and inspect that row's actual DOM before
   changing the matcher.

@@ -1,7 +1,7 @@
 import { Decoration, EditorView } from "@codemirror/view";
 import { JSDOM } from "jsdom";
 import { concealBacklinkMatch, startBacklinksCleanup, createBacklinksCleanupManager } from "../src/backlinks-cleanup.ts";
-import { createMetadataHidingField, renderedBlockTokenRanges } from "../src/metadata-hiding.ts";
+import { createMetadataHidingField, findLivePreviewHiddenRanges } from "../src/metadata-hiding.ts";
 import { debugLog } from "../src/debug.ts";
 import { EditorState, StateEffect, StateField, Text } from "@codemirror/state";
 import { preciseHighlightField, setPreciseHighlight } from "../src/highlight.ts";
@@ -587,12 +587,12 @@ const testLivePreviewField = StateField.define<boolean>({
 });
 
 test("Live Preview hides both metadata formats without changing source or reference resolution", () => {
-  const source = "[[Target#^block|alias]]<!--smart-ref:uuid--> %%ref:legacy%% <!--ordinary--> %%comment%% %%smart-ref:pending%%";
+  const source = "[[Target#^sr-a1b2|alias]]<!--smart-ref:uuid--> %%ref:legacy%% <!--ordinary--> %%comment%% %%smart-ref:pending%%";
   const hiding = createMetadataHidingField(testLivePreviewField);
   const state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding] });
   const hidden: string[] = [];
   state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
-  assert.deepEqual(hidden, ["<!--smart-ref:uuid-->", "%%ref:legacy%%"]);
+  assert.deepEqual(hidden, ["#^sr-a1b2", "<!--smart-ref:uuid-->", "%%ref:legacy%%"]);
   assert.equal(state.doc.toString(), source);
   assert.equal(resolveLivePreviewSpanLink(state.doc.toString(), 0, source.indexOf("alias"), 0, 1)?.refId, "uuid");
 });
@@ -626,42 +626,45 @@ test("metadata concealment coexists with exact editor marks and defaults to visi
   assert.equal(EditorState.create({ doc: source, extensions: [hiding] }).field(hiding).size, 0);
 });
 
-test("Live Preview conceals only generated block anchors and Source retains them", () => {
-  const source = "Paragraph ^sr-9134bc06\r\n^sr-f3f81c62\nKeep ^custom-id\nKeep ^sr-short\nKeep ^sr-9134bc060\nMiddle ^sr-9134bc06 text\n[[Target#^sr-9134bc06|alias]]";
+test("Live Preview conceals generated fragments only inside internal-link destinations", () => {
+  const source = "Paragraph ^sr-9134bc06\n[[Target#^sr-f3f81c62|alias]] [[Target#^custom-id|normal]] [[Target#^sr-UPPER|keep]] [[Target#^sr-a1b2|escaped\\|alias]]";
+  assert.deepEqual(findLivePreviewHiddenRanges(source).map(({ from, to, kind }) => ({
+    text: source.slice(from, to), kind,
+  })), [
+    { text: "#^sr-f3f81c62", kind: "link-block-fragment" },
+    { text: "#^sr-a1b2", kind: "link-block-fragment" },
+  ]);
   const hiding = createMetadataHidingField(testLivePreviewField);
   let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding] });
   const original = state.doc.toString();
   const hidden: string[] = [];
   state.field(hiding).between(0, state.doc.length, (from, to) => { hidden.push(state.doc.sliceString(from, to)); });
-  assert.deepEqual(hidden, ["^sr-9134bc06", "^sr-f3f81c62", "^sr-short", "^sr-9134bc060"]);
+  assert.deepEqual(hidden, ["#^sr-f3f81c62", "#^sr-a1b2"]);
   state = state.update({ effects: setTestLivePreview.of(false) }).state;
   assert.equal(state.field(hiding).size, 0);
   assert.equal(state.doc.toString(), original);
   state = state.update({ effects: setTestLivePreview.of(true) }).state;
-  assert.equal(state.field(hiding).size, 4);
+  assert.equal(state.field(hiding).size, 2);
 });
 
-test("concealed anchors remain available for reference navigation and exact decoration", () => {
-  const source = "Prefix chosen words suffix ^sr-9134bc06";
+test("concealed internal-link fragments remain available for click resolution and exact decorations", () => {
+  const source = "Prefix chosen words suffix [[Target#^sr-9134bc06|alias]]<!--smart-ref:ref-1-->";
   const hiding = createMetadataHidingField(testLivePreviewField);
   let state = EditorState.create({ doc: source, extensions: [testLivePreviewField, hiding, preciseHighlightField] });
   const reference = makeReference({ blockId: "sr-9134bc06" });
-  const link = buildSmartReferenceLink("Target.md", reference.blockId, "alias", reference.refId);
-  assert.equal(resolveLivePreviewSpanLink(link, 0, link.indexOf("alias"), 0, 1)?.refId, reference.refId);
-  const location = locateReference(state.doc.toString(), reference);
-  assert.equal(location.kind, "exact");
-  state = state.update({ effects: setPreciseHighlight.of(location.range) }).state;
+  assert.equal(resolveLivePreviewSpanLink(source, 0, source.indexOf("alias"), 0, 1)?.refId, reference.refId);
+  state = state.update({ effects: setPreciseHighlight.of({ from: 7, to: 19 }) }).state;
   const highlighted: string[] = [];
   state.field(preciseHighlightField).between(0, state.doc.length, (from, to) => { highlighted.push(state.doc.sliceString(from, to)); });
   assert.deepEqual(highlighted, ["chosen words"]);
-  assert.equal(state.field(hiding).size, 1);
+  assert.equal(state.field(hiding).size, 2);
   assert.equal(state.doc.toString(), source);
 });
 
-test("generated anchors use token-compatible marks and rebuild after anchor edits", () => {
+test("internal-link and metadata marks rebuild after source edits", () => {
   const hiding = createMetadataHidingField(testLivePreviewField);
   let state = EditorState.create({
-    doc: "Text ^sr-fa1b9d4b\n%%ref:legacy%%",
+    doc: "[[Target#^sr-fa1b9d4b|alias]] %%ref:legacy%%",
     extensions: [testLivePreviewField, hiding],
   });
   const specs: Array<{ text: string; className: string | undefined }> = [];
@@ -669,13 +672,12 @@ test("generated anchors use token-compatible marks and rebuild after anchor edit
     specs.push({ text: state.doc.sliceString(from, to), className: decoration.spec.class });
   });
   assert.deepEqual(specs, [
-    { text: "^sr-fa1b9d4b", className: "smart-ref-hidden-block-id" },
-    { text: "%%ref:legacy%%", className: "smart-ref-hidden-metadata" },
+    { text: "#^sr-fa1b9d4b", className: "smart-ref-hidden-link-block-fragment" },
+    { text: "%%ref:legacy%%", className: "smart-ref-hidden-legacy-marker" },
   ]);
-  // Editing the reserved prefix reveals a normal user anchor immediately.
-  state = state.update({ changes: { from: 6, to: 8, insert: "my" } }).state;
+  const prefix = state.doc.toString().indexOf("sr-");
+  state = state.update({ changes: { from: prefix, to: prefix + 3, insert: "user-" } }).state;
   assert.equal(state.field(hiding).size, 1);
-  assert.equal(state.doc.line(1).text, "Text ^my-fa1b9d4b");
   state = state.update({ effects: setTestLivePreview.of(false) }).state;
   assert.equal(state.field(hiding).size, 0);
 });
@@ -862,21 +864,7 @@ test("Backlinks persistent observer repairs refreshed wrapper visibility without
   stop();
 });
 
-test("Live Preview maps only reserved cm-blockid syntax tokens to current source", () => {
-  const { document } = parseHTML('<html><body><span class="cm-blockid">^sr-fa1b9d4b</span><span class="cm-blockid">^sr-az09</span><span class="cm-blockid">^user-id</span><span class="cm-blockid">^sr-Upper</span><span class="cm-blockid">^sr-a-b</span><span>^sr-notatoken</span></body></html>');
-  const source = Array.from(document.body.children).map((node) => node.textContent).join('\n');
-  const state = EditorState.create({ doc: source });
-  const bridge = {
-    contentDOM: document.body,
-    state,
-    posAtDOM: (node: Node) => source.indexOf(node.textContent!),
-  };
-  assert.deepEqual(renderedBlockTokenRanges(bridge).map((range) => range.text), ['^sr-fa1b9d4b', '^sr-az09']);
-  assert.deepEqual(renderedBlockTokenRanges({ ...bridge, posAtDOM: () => 9999 }), []);
-  assert.deepEqual(renderedBlockTokenRanges({ ...bridge, posAtDOM: () => { throw new Error('stale token'); } }), []);
-});
-
-test("CM6 hides all three reserved marker formats and reveals Source without losing exact marks", async () => {
+test("CM6 hides internal-link fragments and metadata while Source and exact marks remain intact", async () => {
   const dom = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
   const globals = ['window', 'document', 'MutationObserver', 'Window', 'HTMLElement', 'Node', 'getComputedStyle'];
   const saved = globals.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
@@ -889,9 +877,11 @@ test("CM6 hides all three reserved marker formats and reveals Source without los
   const htmlMarker = '<!--smart-ref:54d2638-1898-4422-b8b7-fcf864132fae-->';
   const legacyMarker = '%%ref:e4d301ec-f22b-443a-8e45-3b2f7c30ef7c%%';
   const ordinary = '<!--ordinary comment--> %%user content%%';
-  const source = `chosen words ^sr-az09 suffix\nNormal ^user-id\n${htmlMarker} ${legacyMarker} ${ordinary}`;
-  const anchorFrom = source.indexOf('^sr-');
-  const userFrom = source.indexOf('^user-');
+  const smartLink = '[[Target#^sr-az09|alias]]';
+  const normalLink = '[[Target#^user-id|normal]]';
+  const source = `chosen words ${smartLink} ${normalLink}\n${htmlMarker} ${legacyMarker} ${ordinary}`;
+  const smartLinkFrom = source.indexOf(smartLink);
+  const normalLinkFrom = source.indexOf(normalLink);
   const errors: unknown[] = [];
   let view: EditorView | undefined;
   try {
@@ -901,36 +891,34 @@ test("CM6 hides all three reserved marker formats and reveals Source without los
       extensions: [testLivePreviewField, hiding, preciseHighlightField,
         EditorView.exceptionSink.of((error) => errors.push(error)),
         EditorView.decorations.of(Decoration.set([
-          Decoration.mark({ class: 'cm-blockid' }).range(anchorFrom, anchorFrom + 8),
-          Decoration.mark({ class: 'cm-blockid' }).range(userFrom, userFrom + '^user-id'.length),
+          Decoration.mark({ class: 'cm-hmd-internal-link cm-link-alias' }).range(smartLinkFrom, smartLinkFrom + smartLink.length),
+          Decoration.mark({ class: 'cm-hmd-internal-link cm-link-alias' }).range(normalLinkFrom, normalLinkFrom + normalLink.length),
           Decoration.mark({ class: 'cm-comment' }).range(source.indexOf(htmlMarker), source.length),
         ])),
       ],
     }) });
-    // The fixture's token is not line-ending: only the rendered-token bridge hides it.
-    await new Promise((resolve) => setTimeout(resolve, 60));
     assert.deepEqual(errors, []);
     assert.equal(view.state.field(hiding).size, 3);
-    const metadata = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.smart-ref-hidden-metadata'));
+    const metadata = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.smart-ref-hidden-html-marker, .smart-ref-hidden-legacy-marker'));
     assert.deepEqual(metadata.map((node) => node.textContent), [htmlMarker, legacyMarker]);
     for (const node of metadata) assert.equal(dom.window.getComputedStyle(node).display, 'none');
     const visible = view.contentDOM.cloneNode(true) as HTMLElement;
-    visible.querySelectorAll('.smart-ref-hidden-metadata, .smart-ref-hidden-block-id').forEach((node) => node.remove());
+    visible.querySelectorAll('[class*="smart-ref-hidden-"]').forEach((node) => node.remove());
     assert.ok(visible.textContent?.includes(ordinary));
     assert.ok(!visible.textContent?.includes(htmlMarker));
     assert.ok(!visible.textContent?.includes(legacyMarker));
-    const hidden = view.contentDOM.querySelector<HTMLElement>('.smart-ref-hidden-block-id')!;
-    assert.equal(hidden.textContent, '^sr-az09');
+    const hidden = view.contentDOM.querySelector<HTMLElement>('.smart-ref-hidden-link-block-fragment')!;
+    assert.equal(hidden.textContent, '#^sr-az09');
     assert.equal(dom.window.getComputedStyle(hidden).display, 'none');
-    assert.equal(view.contentDOM.querySelectorAll('.cm-blockid').length, 2);
-    const userToken = Array.from(view.contentDOM.querySelectorAll('.cm-blockid')).find((node) => node.textContent === '^user-id')!;
-    assert.equal(userToken.closest('.smart-ref-hidden-block-id'), null);
-    assert.equal(userToken.querySelector('.smart-ref-hidden-block-id'), null);
+    assert.equal(view.contentDOM.querySelectorAll('.cm-hmd-internal-link.cm-link-alias').length, 2);
+    const normal = Array.from(view.contentDOM.querySelectorAll('.cm-hmd-internal-link'))
+      .find((node) => node.textContent?.includes('#^user-id'))!;
+    assert.equal(normal.querySelector('[class*="smart-ref-hidden-"]'), null);
     view.dispatch({ effects: setPreciseHighlight.of({ from: 0, to: 12 }) });
     assert.equal(view.contentDOM.querySelector('.smart-ref-precise-highlight')?.textContent, 'chosen words');
     view.dispatch({ effects: setTestLivePreview.of(false) });
     await new Promise((resolve) => setTimeout(resolve, 30));
-    assert.equal(view.contentDOM.querySelector('.smart-ref-hidden-block-id, .smart-ref-hidden-metadata'), null);
+    assert.equal(view.contentDOM.querySelector('[class*="smart-ref-hidden-"]'), null);
     assert.equal(view.contentDOM.textContent, source.replace(/\n/g, ''));
     assert.equal(view.state.doc.toString(), source);
     assert.deepEqual(errors, []);
