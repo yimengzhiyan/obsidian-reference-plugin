@@ -4,6 +4,8 @@ import { debugLog } from "./debug.ts";
 const PANE = ".backlink-pane";
 const MATCH = ".search-result-file-match";
 const HIDDEN = "smart-ref-hidden-backlink-metadata";
+const CLICKABLE = "a, [href], [data-href], [role='link'], button, .internal-link";
+const SMART_REFERENCE_EVIDENCE = /\^sr-[a-z0-9]+|%%ref:[A-Za-z0-9_-]+%%|<!--smart-ref:[A-Za-z0-9_-]+-->/;
 
 function reveal(root: Element): void {
   root.querySelectorAll(`span.${HIDDEN}`).forEach((span) => {
@@ -56,6 +58,83 @@ const skipReason = (row: Element) => !row.matches(MATCH) ? "not-backlink-row"
   : !row.closest(PANE) ? "outside-backlink-pane"
   : row.closest(".cm-editor") ? "inside-cm-editor" : null;
 
+function describeTextOwners(row: Element): Array<Record<string, unknown>> {
+  const walker = row.ownerDocument.createTreeWalker(row, 4 /* SHOW_TEXT */);
+  const owners: Array<Record<string, unknown>> = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    owners.push({
+      text: node.textContent,
+      containsGeneratedBlockId: /\^sr-[a-z0-9]+/.test(node.textContent ?? ""),
+      parentTag: parent?.tagName ?? null,
+      parentClass: parent?.className ?? null,
+      parentOuterHTML: parent?.outerHTML ?? null,
+      ancestorChain: describeAncestorChain(parent, row),
+    });
+  }
+  return owners;
+}
+
+function describeAncestorChain(element: Element | null, row: Element): Array<Record<string, unknown>> {
+  const chain: Array<Record<string, unknown>> = [];
+  for (let current = element; current; current = current.parentElement) {
+    chain.push({
+      tagName: current.tagName,
+      className: current.className,
+      id: current.id || null,
+      role: current.getAttribute("role"),
+      href: current.getAttribute("href"),
+      dataHref: current.getAttribute("data-href"),
+    });
+    if (current === row) break;
+  }
+  return chain;
+}
+
+function describeChildElements(row: Element): Array<Record<string, unknown>> {
+  return Array.from(row.querySelectorAll<HTMLElement>("*")).map((element) => ({
+    tagName: element.tagName,
+    className: element.className,
+    id: element.id || null,
+    text: element.textContent,
+    outerHTML: element.outerHTML,
+  }));
+}
+
+function describeClickableElements(row: Element): Array<Record<string, unknown>> {
+  const elements = Array.from(row.querySelectorAll<HTMLElement>(CLICKABLE));
+  if (row.matches(CLICKABLE)) elements.unshift(row as HTMLElement);
+  return elements.map((element) => {
+    const href = element.getAttribute("href");
+    const dataHref = element.getAttribute("data-href");
+    const text = element.textContent ?? "";
+    return {
+      tagName: element.tagName,
+      className: element.className,
+      role: element.getAttribute("role"),
+      href,
+      dataHref,
+      text,
+      containsSmartReference: SMART_REFERENCE_EVIDENCE.test(`${href ?? ""} ${dataHref ?? ""} ${text}`),
+      outerHTML: element.outerHTML,
+    };
+  });
+}
+
+function describeMutation(record: MutationRecord): Record<string, unknown> {
+  const target = record.target.nodeType === 1
+    ? record.target as Element
+    : record.target.parentElement;
+  return {
+    type: record.type,
+    targetTag: target?.tagName ?? null,
+    targetClass: target?.className ?? null,
+    targetOuterHTML: target?.outerHTML ?? null,
+    addedNodes: Array.from(record.addedNodes, (node) => node.nodeType === 1 ? (node as Element).outerHTML : node.textContent),
+    removedNodes: Array.from(record.removedNodes, (node) => node.nodeType === 1 ? (node as Element).outerHTML : node.textContent),
+  };
+}
+
 /** Hide only complete reserved markers, even when search-match spans split them. */
 export function concealBacklinkMatch(snippet: Element): number {
   if (skipReason(snippet)) return 0;
@@ -101,21 +180,71 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   let stopped = false;
   const attachPane = (pane: Element, reason: string): BacklinksCleanup => {
     let disposed = false;
+    const postCleanupSnapshots = new WeakMap<Element, string>();
     const clean = (trigger = "pane-mutation") => {
       if (disposed || stopped || !root.contains(pane)) return;
       const rows = Array.from(pane.querySelectorAll(MATCH))
         .filter((row) => row.closest(PANE) === pane);
       let hiddenMarkerCount = 0;
       for (const row of rows) {
+        const hasSmartReference = SMART_REFERENCE_EVIDENCE.test(row.textContent ?? "");
+        if (hasSmartReference) {
+          debugLog(() => {
+            const previousPostCleanupOuterHTML = postCleanupSnapshots.get(row) ?? null;
+            const beforeOuterHTML = row.outerHTML;
+            const hasHiddenWrappers = row.querySelector(`.${HIDDEN}`) !== null;
+            const textNodeOwners = describeTextOwners(row);
+            return ["[Smart Reference] Backlinks row before cleanup", {
+              reason: trigger,
+              row,
+              beforeOuterHTML,
+              previousPostCleanupOuterHTML,
+              rowIdentitySeenBefore: previousPostCleanupOuterHTML !== null,
+              newRowAfterObserverMutation: trigger === "pane-mutation" && previousPostCleanupOuterHTML === null,
+              contentChangedAfterPreviousCleanup: previousPostCleanupOuterHTML !== null && beforeOuterHTML !== previousPostCleanupOuterHTML,
+              rawContentRestored: previousPostCleanupOuterHTML !== null && !hasHiddenWrappers,
+              childElements: describeChildElements(row),
+              textNodeOwners,
+              smartReferenceTextNodes: textNodeOwners
+                .filter((owner) => owner.containsGeneratedBlockId === true),
+              clickableElements: describeClickableElements(row),
+            }];
+          });
+        }
         reveal(row);
-        hiddenMarkerCount += concealBacklinkMatch(row);
+        const rowHiddenMarkerCount = concealBacklinkMatch(row);
+        hiddenMarkerCount += rowHiddenMarkerCount;
+        if (hasSmartReference) {
+          debugLog(() => {
+            const afterOuterHTML = row.outerHTML;
+            const textNodeOwners = describeTextOwners(row);
+            postCleanupSnapshots.set(row, afterOuterHTML);
+            return ["[Smart Reference] Backlinks row after cleanup", {
+              reason: trigger,
+              row,
+              afterOuterHTML,
+              rowHiddenMarkerCount,
+              childElements: describeChildElements(row),
+              textNodeOwners,
+              smartReferenceTextNodes: textNodeOwners
+                .filter((owner) => owner.containsGeneratedBlockId === true),
+              clickableElements: describeClickableElements(row),
+            }];
+          });
+        }
       }
       observer.takeRecords();
       debugLog(() => ["[Smart Reference] Backlinks cleanup", {
         reason: trigger, target: pane, matchedBacklinkRows: rows.length, hiddenMarkerCount,
       }]);
     };
-    const observer = new Observer(() => clean());
+    const observer = new Observer((records) => {
+      debugLog(() => ["[Smart Reference] Backlinks observer triggered", {
+        target: pane,
+        mutations: records.map(describeMutation),
+      }]);
+      clean();
+    });
     observer.observe(pane, {
       childList: true, subtree: true, characterData: true,
       attributes: true, attributeFilter: ["class", "hidden", "style"],

@@ -57,20 +57,28 @@
   unescaped alias separator, and tolerates nested-node line breaks and zero-width
   characters. Standalone generated IDs use the full reserved lowercase-alphanumeric
   pattern rather than the earlier eight-hex-only subset.
+- That parser also failed in the real Vault, and runtime inspection confirmed the
+  Backlinks pane contains zero `<a>` elements. Temporary opt-in diagnostics now log
+  every Smart Reference row's `outerHTML` immediately before and after cleanup,
+  every descendant tag/class, the exact Text node containing `^sr-` with its
+  parent/ancestor chain, candidate clickable elements, observer mutation records,
+  row identity changes and whether previously cleaned content was restored. No
+  further parser change is included in this diagnostic commit.
 - The correction uses the existing hidden text wrappers, preserving any enclosing
   anchor, href and event handlers. Ordinary Wiki Links remain unchanged.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
   file, leaf and layout changes. Users reported that some rows remained visible
   after earlier repairs. The literal reported markers match in DOM fixtures, but
-  no failing row's actual DOM was captured. Do not claim the mixed-row issue is
-  resolved until the current build is validated in the Vault.
+  no failing row's actual DOM has yet been captured from these new lifecycle logs.
+  Do not claim the issue resolved until that evidence identifies the owner/rerender.
 
 ## Integration cleanup
 
 Reviewed the commits from `main` through this branch. Functional changes for
 creation, marker association, Reading View, Live Preview, editor decoration and
-Backlinks remain. Removed temporary row HTML/node snapshots, detailed Reading View
-text dumps and redundant source-text diagnostics. Retained concise optional logs
+Backlinks remain. Detailed Reading View text dumps and redundant source-text
+diagnostics remain removed. Temporarily restored Backlinks row HTML/node snapshots
+after the real Vault disproved the parser-only fix. Retained concise optional logs
 for click resolution, applied highlight kind/fallback, editor decoration, metadata
 concealment and Backlinks observer lifecycle/counts.
 
