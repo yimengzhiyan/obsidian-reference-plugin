@@ -961,3 +961,14 @@ markers. Do not query editor DOM or dispatch supplemental token ranges. Gate the
 field with `editorLivePreviewField`, preserving raw Source mode, click association,
 exact highlight decorations and the Reading View path. Standalone IDs and ordinary
 block-link fragments remain visible.
+
+
+## D-054 — Restore Smart Reference aliases during Reading View annotation
+
+Obsidian can render a generated `[[Target#^sr-id|alias]]` as the target name even
+though the source alias remains intact. Extend the existing Reading View source-to-
+anchor association to retain the matched Wiki Link. Only a link with an adjacent
+ref marker and a generated `#^sr-[a-z0-9]+` destination may replace rendered anchor
+text with its source alias. Keep normal links and ambiguous associations unchanged.
+This is a postprocessor display correction; it does not change Markdown, click
+resolution, navigation, Live Preview decorations or exact highlighting.

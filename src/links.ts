@@ -105,11 +105,16 @@ export function annotateRenderedSmartReferences(
   const identities = anchors.map((anchor) => ({
     target: anchor.dataset.href || anchor.getAttribute("href") || "",
   }));
-  const refIds = resolveRenderedReferenceIds(source, identities, resolvePath);
-  for (const [index, sourceRefId] of refIds.entries()) {
-    const refId = adjacentCommentRefId(anchors[index]) ?? sourceRefId;
+  const sourceLinks = resolveRenderedSmartReferenceLinks(source, identities, resolvePath);
+  for (const [index, sourceLink] of sourceLinks.entries()) {
+    const refId = adjacentCommentRefId(anchors[index]) ?? sourceLink?.refId ?? null;
     if (refId) anchors[index].setAttribute(SMART_REF_ATTRIBUTE, refId);
     else anchors[index].removeAttribute(SMART_REF_ATTRIBUTE);
+
+    const alias = sourceLink ? readingViewAlias(sourceLink) : null;
+    if (alias !== null && anchors[index].textContent !== alias) {
+      anchors[index].textContent = alias;
+    }
   }
 }
 
@@ -121,13 +126,22 @@ export function resolveRenderedReferenceIds(
   anchors: readonly RenderedLinkIdentity[],
   resolvePath: ResolveLinkPath = (path) => path,
 ): Array<string | null> {
-  const results: Array<string | null> = anchors.map(() => null);
-  const sourceGroups = new Map<string, Array<string | null>>();
+  return resolveRenderedSmartReferenceLinks(source, anchors, resolvePath)
+    .map((link) => link?.refId ?? null);
+}
+
+function resolveRenderedSmartReferenceLinks(
+  source: string,
+  anchors: readonly RenderedLinkIdentity[],
+  resolvePath: ResolveLinkPath,
+): Array<WikiLink | null> {
+  const results: Array<WikiLink | null> = anchors.map(() => null);
+  const sourceGroups = new Map<string, WikiLink[]>();
   for (const link of parseWikiLinks(source)) {
     const key = blockTargetKey(link.target, resolvePath);
     if (!key) continue;
     const group = sourceGroups.get(key) ?? [];
-    group.push(link.refId);
+    group.push(link);
     sourceGroups.set(key, group);
   }
   const renderedGroups = new Map<string, number[]>();
@@ -139,13 +153,18 @@ export function resolveRenderedReferenceIds(
     renderedGroups.set(key, group);
   });
   for (const [key, indexes] of renderedGroups) {
-    const sourceIds = sourceGroups.get(key);
-    if (!sourceIds || sourceIds.length !== indexes.length) continue;
+    const sourceLinks = sourceGroups.get(key);
+    if (!sourceLinks || sourceLinks.length !== indexes.length) continue;
     indexes.forEach((index, ordinal) => {
-      results[index] = sourceIds[ordinal];
+      results[index] = sourceLinks[ordinal]?.refId ? sourceLinks[ordinal] : null;
     });
   }
   return results;
+}
+
+function readingViewAlias(link: WikiLink): string | null {
+  if (!link.refId || link.alias === null || !/#\^sr-[a-z0-9]+$/.test(link.target)) return null;
+  return link.alias.replace(/\\\|/g, "|");
 }
 
 /** Resolve a click without any annotation state. A unique target is the

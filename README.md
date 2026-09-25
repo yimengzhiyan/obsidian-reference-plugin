@@ -60,7 +60,9 @@ A Markdown postprocessor annotates rendered links as an optimization. On click,
 the handler checks `data-smart-ref-id`, an adjacent DOM comment, then current
 Markdown from the containing view. The source fallback pairs resolved target
 path/block ID and link order, counting ordinary links too. It never waits for
-annotation; ambiguous count mismatches retain native navigation.
+annotation; ambiguous count mismatches retain native navigation. For an associated
+generated Smart Reference, the postprocessor also restores the source alias when
+Reading View displays the internal target name. Ordinary links are not rewritten.
 
 After navigation, the locator finds the block in Markdown. Obsidian renders its
 current source into a detached container; normalized full block text identifies a

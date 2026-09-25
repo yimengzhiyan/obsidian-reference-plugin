@@ -396,6 +396,27 @@ test("annotation uses DOM comments without section source and source when commen
   assert.equal(attrs.has("data-smart-ref-id"), false);
 });
 
+test("Reading View restores the alias for a generated Smart Reference", () => {
+  const { document } = parseHTML('<html><body><div id="root"><a class="internal-link" data-href="Target#^sr-id">Target</a></div></body></html>');
+  const root = document.querySelector<HTMLElement>("#root")!;
+  const anchor = root.querySelector<HTMLAnchorElement>("a")!;
+  annotateRenderedSmartReferences(root, "[[Target#^sr-id|alias]]<!--smart-ref:uuid-->");
+  assert.equal(anchor.textContent, "alias");
+  assert.equal(anchor.dataset.smartRefId, "uuid");
+  assert.equal(anchor.dataset.href, "Target#^sr-id");
+});
+
+test("Reading View leaves normal Obsidian links unchanged", () => {
+  const { document } = parseHTML('<html><body><div id="root"><a class="internal-link" data-href="Target#^normal-id">Obsidian display</a><a class="internal-link" data-href="Other#^sr-id">Other display</a></div></body></html>');
+  const root = document.querySelector<HTMLElement>("#root")!;
+  const anchors = root.querySelectorAll<HTMLAnchorElement>("a");
+  annotateRenderedSmartReferences(root, "[[Target#^normal-id|normal alias]] [[Other#^sr-id|ordinary alias]]");
+  assert.equal(anchors[0].textContent, "Obsidian display");
+  assert.equal(anchors[1].textContent, "Other display");
+  assert.equal(anchors[0].hasAttribute("data-smart-ref-id"), false);
+  assert.equal(anchors[1].hasAttribute("data-smart-ref-id"), false);
+});
+
 
 test("Reading click resolves one Smart Reference without prior DOM annotation", () => {
   const anchors = [{ target: "Target#^block" }]; // No dataset/refId/comment input.

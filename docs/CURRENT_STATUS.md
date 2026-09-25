@@ -13,6 +13,17 @@
 - Source mode retains raw Markdown. Plugin metadata and generated anchors remain
   in the source for native block-link navigation.
 
+## Current Reading View display repair
+
+- Runtime validation found that a generated `[[Target#^sr-id|alias]]` could display
+  `Target` instead of its alias in Reading View.
+- The existing postprocessor now retains the source Wiki Link matched by target,
+  block ID and same-target order. When that link has an adjacent ref marker and a
+  generated `#^sr-[a-z0-9]+` target, it restores the alias on the rendered anchor.
+- Normal links, ambiguous associations and generated-looking links without a ref
+  marker remain unchanged. Navigation attributes and highlight behavior are not
+  modified. Real-Obsidian validation of the repaired display is still required.
+
 ## Current Live Preview concealment repair
 
 - Runtime evidence showed there are no `.cm-blockid` nodes for these references;
@@ -51,12 +62,14 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 64 passed
+- `npm test`: 66 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
 - Real Vault: validate internal-link fragment and metadata concealment in Live
   Preview, plus raw syntax in Source mode.
+- Real Vault: confirm Reading View displays the Smart Reference alias rather than
+  the generated target fragment.
 - Real Vault: validate Backlinks after opening, switching and clicking notes. If a
   row still leaks, enable debug logging and inspect that row's actual DOM before
   changing the matcher.
