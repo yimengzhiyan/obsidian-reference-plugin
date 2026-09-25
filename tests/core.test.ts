@@ -812,8 +812,8 @@ test("Backlinks row cleanup hides all reserved tokens across nested and sibling 
   const row = document.querySelector('.search-result-file-match')!;
   row.innerHTML = '<span class="search-result-file-matched-text">[[Target#^sr-f3f81c62|科伊村]]</span>\n&lt;!--smart-<span>ref:e54d2638-1898-4422-b8b7-fcf864132fae</span>--&gt; %%ref:uuid%% ^sr-9134bc06 ^custom ^sr-short ^sr-9134bc060 ^sr-9134bc06-extra';
   const original = row.textContent;
-  assert.equal(concealBacklinkMatch(row), 5);
-  assert.equal(visibleSnippetText(row), '科伊村\n   ^custom ^sr-short ^sr-9134bc060 ^sr-9134bc06-extra');
+  assert.equal(concealBacklinkMatch(row), 7);
+  assert.equal(visibleSnippetText(row), '科伊村\n   ^custom   ^sr-9134bc06-extra');
   assert.equal(row.textContent, original);
 });
 
@@ -836,6 +836,13 @@ test("Backlinks leaves normal Wiki Links unchanged", () => {
   const row = document.querySelector('.search-result-file-match')!;
   assert.equal(concealBacklinkMatch(row), 0);
   assert.equal(visibleSnippetText(row), '[[Target#^normal-id|normal alias]]');
+});
+
+test("Backlinks renders a split Smart Reference link as its alias", () => {
+  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match"><span>[[Folder/Target#^sr-</span><span>fa1b9d4b</span><span>\n|split alias]]</span>\n&lt;!--smart-<span>ref:uuid</span>--&gt; <span>[[Normal#^user-id|normal link]]</span></div></div></body></html>');
+  const row = document.querySelector('.search-result-file-match')!;
+  assert.equal(concealBacklinkMatch(row), 3);
+  assert.equal(visibleSnippetText(row), 'split alias\n [[Normal#^user-id|normal link]]');
 });
 
 test("Backlinks pane observers handle opening, delayed text, note switches and replacement", async () => {

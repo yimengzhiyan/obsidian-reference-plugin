@@ -1005,3 +1005,15 @@ the Markdown postprocessor hides matching rendered text with a scoped wrapper,
 validating against section source when available. Preserve the text node, Markdown
 source and native block identity. Do not match normal IDs such as `^my-custom-id`.
 Navigation, exact highlighting and Backlinks logic remain unchanged.
+
+
+## D-058 — Parse Smart Reference Wiki Links over aggregated Backlinks text
+
+Backlinks can split raw Wiki Link syntax across nested search-highlight nodes and
+insert line breaks or zero-width characters. A single strict regex can therefore
+miss a visibly complete Smart Reference. Parse Wiki Link bounds over the row's
+aggregated text, find the unescaped alias separator, normalize rendering-only
+characters in the target, and conceal only the generated link's opening syntax and
+closing brackets. Continue using reversible wrappers so existing anchors, hrefs
+and event handlers survive. Normal Wiki Links remain unchanged. Match standalone
+reserved IDs as `^sr-[a-z0-9]+`, consistent with generated reference syntax.

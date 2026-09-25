@@ -9,7 +9,7 @@
 - [x] Keep opt-in runtime `SMART_REFERENCE_DEBUG` logging
 - [x] Delete the three empty untracked Backlinks investigation files
 - [x] Update README and current handoff status
-- [x] Confirm final test, typecheck, build and diff checks (69 tests)
+- [x] Confirm final test, typecheck, build and diff checks (70 tests)
 - [x] Replace failed `.cm-blockid` bridge with internal Wiki Link source ranges
 - [x] Test `#^sr-` link fragments, both marker formats, Source mode and exact highlights
 - [x] Replace the unreliable Live Preview fragment CSS mark with a CM6 range replacement
@@ -17,6 +17,7 @@
 - [x] Restore generated Smart Reference aliases in Reading View without rewriting normal links
 - [ ] Real Obsidian: verify Reading View shows the alias instead of the internal target
 - [x] Render raw Smart Reference Wiki Links as aliases in Backlinks while preserving anchors
+- [x] Parse Smart Reference Backlinks split across nested rendered text nodes
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes

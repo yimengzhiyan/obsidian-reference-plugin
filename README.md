@@ -106,13 +106,15 @@ editor highlighting works when the existing navigation/command opens that target
 ### Backlinks display
 
 A document-level discovery observer and pane observers clean complete
-`%%ref:id%%`, `<!--smart-ref:id-->` and generated `^sr-xxxxxxxx` text
+`%%ref:id%%`, `<!--smart-ref:id-->` and generated `^sr-[a-z0-9]+` text
 tokens within `.backlink-pane .search-result-file-match` rows. The full row is scanned, including nested
 `.search-result-file-matched-text` spans and sibling text. Hidden wrappers preserve
 textContent, link elements, href attributes and native handlers; no Markdown or
 metadata is rewritten. When Backlinks exposes a generated Wiki Link as raw text,
 the wrappers conceal `[[Target#^sr-id|` and `]]`, leaving only its alias visible.
-Normal Wiki Links remain unchanged. Split tokens and delayed text updates are supported.
+The parser works over aggregated row text, tolerating syntax split across nested
+highlight nodes, line breaks and zero-width rendering characters. Normal Wiki
+Links remain unchanged. Split tokens and delayed text updates are supported.
 Each workspace document has a discovery observer above its body and one cleanup
 observer attached to each current `.backlink-pane`. File-open, active-view and
 layout events reconcile actual pane identities: removed panes are disconnected,

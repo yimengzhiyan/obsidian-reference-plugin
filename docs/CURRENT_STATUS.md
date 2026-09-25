@@ -52,6 +52,11 @@
   markers, but hiding only the generated block token left broken display text such
   as `[[Target#|alias]]`. Backlinks cleanup now recognizes the complete generated
   Wiki Link and hides its opening syntax and closing brackets, leaving only alias.
+- A later Vault check still exposed complete syntax when Backlinks split a rendered
+  link across nodes. The matcher now parses aggregated row Wiki Links, finds the
+  unescaped alias separator, and tolerates nested-node line breaks and zero-width
+  characters. Standalone generated IDs use the full reserved lowercase-alphanumeric
+  pattern rather than the earlier eight-hex-only subset.
 - The correction uses the existing hidden text wrappers, preserving any enclosing
   anchor, href and event handlers. Ordinary Wiki Links remain unchanged.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
@@ -76,7 +81,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 69 passed
+- `npm test`: 70 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

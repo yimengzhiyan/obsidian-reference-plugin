@@ -15,12 +15,16 @@ type HiddenTextRange = { from: number; to: number };
 
 function hiddenTextRanges(text: string): HiddenTextRange[] {
   const ranges: HiddenTextRange[] = [];
-  const wikiLinks = Array.from(text.matchAll(/\[\[[^\]\n]+\]\]/g));
+  const wikiLinks = Array.from(text.matchAll(/\[\[([\s\S]*?)\]\]/g));
 
-  for (const match of text.matchAll(/\[\[[^\]\n|]+#\^sr-[a-z0-9]+\|[^\]\n]*\]\]/g)) {
+  for (const match of wikiLinks) {
+    const linktext = match[1];
+    const aliasSeparator = findUnescapedAliasSeparator(linktext);
+    if (aliasSeparator < 0) continue;
+    const target = linktext.slice(0, aliasSeparator).replace(/[\u200B\uFEFF\r\n]/g, "");
+    if (!/#\^sr-[a-z0-9]+$/.test(target)) continue;
     const from = match.index!;
-    const separator = match[0].indexOf("|");
-    ranges.push({ from, to: from + separator + 1 });
+    ranges.push({ from, to: from + 2 + aliasSeparator + 1 });
     ranges.push({ from: from + match[0].length - 2, to: from + match[0].length });
   }
 
@@ -28,13 +32,25 @@ function hiddenTextRanges(text: string): HiddenTextRange[] {
     ranges.push({ from: match.index!, to: match.index! + match[0].length });
   }
 
-  for (const match of text.matchAll(/(?<![A-Za-z0-9_])\^sr-[0-9a-f]{8}(?![A-Za-z0-9_-])/g)) {
+  for (const match of text.matchAll(/(?<![A-Za-z0-9_])\^sr-[a-z0-9]+(?![A-Za-z0-9_-])/g)) {
     const from = match.index!;
     if (wikiLinks.some((link) => from >= link.index! && from < link.index! + link[0].length)) continue;
     ranges.push({ from, to: from + match[0].length });
   }
 
   return ranges.sort((left, right) => left.from - right.from || left.to - right.to);
+}
+
+function findUnescapedAliasSeparator(linktext: string): number {
+  for (let index = 0; index < linktext.length; index += 1) {
+    if (linktext[index] !== "|") continue;
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && linktext[cursor] === "\\"; cursor -= 1) {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) return index;
+  }
+  return -1;
 }
 const skipReason = (row: Element) => !row.matches(MATCH) ? "not-backlink-row"
   : !row.closest(PANE) ? "outside-backlink-pane"
