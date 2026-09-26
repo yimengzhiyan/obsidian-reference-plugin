@@ -74,10 +74,17 @@
   a lightweight observer compares each tracked view's mode after container changes
   and during file/layout/active-leaf workspace synchronization. A detected
   `preview ↔ source` transition triggers the same delayed Backlinks refresh.
+- Same-leaf file navigation does not necessarily emit `active-leaf-change`. The
+  explicit `file-open` listener now waits two animation frames for Live Preview's
+  Backlinks refresh, then enters the existing immediate/frame/settled cleanup
+  pipeline. The file path and current Markdown view mode are carried through all
+  pane-level passes, including mutation-triggered continuations.
 - Optional cleanup diagnostics now include the trigger source, cumulative cleanup
   runs, per-run matches/replacements, cache hits/misses, text changes and replacement
   execution, plus cumulative replacements attributed to mode switches versus
-  pointer/focus interactions.
+  pointer/focus interactions. Trigger sources normalize to `file-open`,
+  `active-leaf-change`, `mode-switch` and `mutation`; the settled file-open record
+  includes its path, mode and replacement count.
 
 ## Integration cleanup
 
@@ -95,7 +102,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 75 passed
+- `npm test`: 76 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

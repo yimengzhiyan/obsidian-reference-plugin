@@ -123,13 +123,19 @@ arrive after the workspace event. Content observers remain connected during clea
 plugin-generated mutations do not trigger a cleanup loop. Unload disconnects all
 observers and removes wrappers; Source and Live Preview are unchanged.
 
+The `file-open` event has its own two-frame delay before entering the existing
+immediate/frame/settled cleanup pipeline. This covers file changes in the same
+Markdown leaf, where `active-leaf-change` does not fire and Live Preview can refresh
+Backlinks after the initial workspace event.
+
 This depends on Obsidian’s private Backlinks DOM. The confirmed hierarchy is
 `.backlink-pane` → `.search-result-container` → `.search-result-file-match` →
 `.search-result-file-matched-text`; the result row is clickable and does not contain
 an anchor element. Other layouts, global search and truncated markers are not
 covered. Workspace pop-out documents use the same scoped cleanup.
 Optional debug logs report workspace events, observer attachment and disconnection,
-matched row counts and hidden marker counts.
+matched row counts, hidden marker counts and normalized `file-open`,
+`active-leaf-change`, `mode-switch` and `mutation` trigger sources.
 For Backlinks troubleshooting, enable the runtime debug switch and inspect
 `Backlinks cleanup` counts. If a row still leaks, capture its DOM from the Vault;
 the large temporary row snapshots have been removed from normal builds.

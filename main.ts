@@ -1,7 +1,9 @@
 import { debugLog } from "./src/debug.ts";
 import {
+  type BacklinksRefreshContext,
   createBacklinksCleanupManager,
   createMarkdownViewModeWatcher,
+  scheduleBacklinksCleanupAfterRender,
 } from "./src/backlinks-cleanup.ts";
 import {
   Editor,
@@ -58,7 +60,8 @@ export default class ReferencePlugin extends Plugin {
       backlinks.attach(view.containerEl.ownerDocument);
       backlinks.refresh(`markdown-view-mode-change:${from}-to-${to}:${trigger}`);
     });
-    const refreshBacklinks = (event: string) => {
+    let cancelPendingFileOpenCleanup: (() => void) | null = null;
+    const refreshBacklinks = (event: string, context?: BacklinksRefreshContext) => {
       const markdownViews: MarkdownView[] = [];
       backlinks.attach(document);
       this.app.workspace.iterateAllLeaves((leaf) => {
@@ -66,13 +69,26 @@ export default class ReferencePlugin extends Plugin {
         if (leaf.view instanceof MarkdownView) markdownViews.push(leaf.view);
       });
       markdownViewModes.sync(markdownViews, event);
-      backlinks.refresh(event);
+      backlinks.refresh(event, context);
     };
     this.register(() => {
+      cancelPendingFileOpenCleanup?.();
       markdownViewModes.destroy();
       backlinks.destroy();
     });
-    this.registerEvent(this.app.workspace.on("file-open", () => refreshBacklinks("file-open")));
+    this.registerEvent(this.app.workspace.on("file-open", (file) => {
+      cancelPendingFileOpenCleanup?.();
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const context: BacklinksRefreshContext = {
+        openedFilePath: file?.path ?? null,
+        currentMarkdownViewMode: activeView?.getMode() ?? null,
+      };
+      const doc = activeView?.containerEl.ownerDocument ?? document;
+      cancelPendingFileOpenCleanup = scheduleBacklinksCleanupAfterRender(doc, context, () => {
+        cancelPendingFileOpenCleanup = null;
+        refreshBacklinks("file-open", context);
+      });
+    }));
     this.registerEvent(this.app.workspace.on("layout-change", () => refreshBacklinks("layout-change")));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => refreshBacklinks("active-leaf-change")));
     this.registerEvent(this.app.workspace.on("window-open", (_win, opened) => backlinks.attach(opened.document)));

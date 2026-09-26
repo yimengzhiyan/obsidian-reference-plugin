@@ -1081,3 +1081,21 @@ content, cause the same elements to be processed again. Fully concealed ranges a
 already ignored by the text-node wrapper operation, so stable rows produce no DOM
 writes and cannot create an observer loop. Debug output records cache hit/miss,
 text changes and whether alias replacement executed.
+
+
+## D-064 — Delay Backlinks cleanup after same-leaf file opens
+
+Opening another file in the same Markdown leaf may leave the active leaf unchanged,
+so `active-leaf-change` cannot cover this lifecycle. Register the public workspace
+`file-open` event explicitly and wait two animation frames for Live Preview and the
+Backlinks pane to refresh before invoking the existing cleanup manager. Do not add
+another parser or workspace event: the delayed callback enters the same immediate,
+frame and settled cleanup pipeline used elsewhere.
+
+Carry the opened path and current `MarkdownView.getMode()` value through the root
+manager, pane reconciliation and mutation continuations. Each pending pane pass owns
+its causal context and replacement count, preventing a later observer callback from
+overwriting file-open diagnostics. A newer file-open cancels the older pre-cleanup
+delay, and plugin unload cancels it as well. This specifically covers same-leaf
+navigation while keeping content-state caching, interaction handling, navigation
+and all renderers unchanged.

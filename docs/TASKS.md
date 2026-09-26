@@ -28,6 +28,9 @@
 - [x] Attribute replacement counters to mode-switch and pointer/focus trigger sources
 - [x] Remove permanent row-level cache skips and track row/matched-text content state
 - [x] Reprocess identical Smart Reference syntax when Obsidian removes hidden wrappers
+- [x] Delay explicit `file-open` cleanup for same-leaf Live Preview navigation
+- [x] Preserve file path/mode diagnostics through mutation and settled pane passes
+- [x] Regression-test same-leaf file-open followed by a delayed Backlinks rerender
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
@@ -791,6 +794,8 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Refresh Backlinks after manual Reading View/Live Preview mode transitions
 - [x] Test workspace-detected and DOM-detected mode changes
 - [x] Regression-test same row and matched-text element restoring identical raw syntax
+- [x] Handle same-leaf Live Preview file navigation through an explicit delayed `file-open` refresh
+- [x] Test that a post-file-open Backlinks rerender is cleaned with its causal diagnostics intact
 - [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
 

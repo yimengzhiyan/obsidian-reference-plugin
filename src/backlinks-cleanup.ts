@@ -143,23 +143,49 @@ export function concealBacklinkMatch(row: Element): number {
   return concealBacklinkMatchWithResult(row).hiddenMarkerCount;
 }
 
-export type BacklinksCleanup = (() => void) & { refresh(reason?: string): void };
+export interface BacklinksRefreshContext {
+  openedFilePath?: string | null;
+  currentMarkdownViewMode?: string | null;
+}
+
+export type BacklinksCleanup = (() => void) & {
+  refresh(reason?: string, context?: BacklinksRefreshContext): void;
+};
+
+function triggerSource(trigger: string): string {
+  const source = trigger.replace(/-(?:frame|settled)$/, "");
+  if (source === "file-open") return "file-open";
+  if (source === "active-leaf-change") return "active-leaf-change";
+  if (source.startsWith("markdown-view-mode-change:")) return "mode-switch";
+  if (source === "pane-mutation") return "mutation";
+  if (source === "row-pointerover" || source === "row-focusin") return "pointer/focus";
+  return source;
+}
 
 /** A stable discovery observer owns one cleanup observer per current pane element. */
 export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
   const Observer = root.ownerDocument.defaultView!.MutationObserver;
   const panes = new Map<Element, BacklinksCleanup>();
   let stopped = false;
-  const attachPane = (pane: Element, reason: string): BacklinksCleanup => {
+  const attachPane = (
+    pane: Element,
+    reason: string,
+    context?: BacklinksRefreshContext,
+  ): BacklinksCleanup => {
     const view = pane.ownerDocument.defaultView!;
     let disposed = false;
     let cleanupRuns = 0;
     let replacementsAfterModeSwitch = 0;
     let replacementsAfterPointerFocus = 0;
-    let pendingReason = "pane-mutation";
     type FrameHandle = { id: number; kind: "animation-frame" | "timeout" };
+    type PendingCleanup = {
+      reason: string;
+      context?: BacklinksRefreshContext;
+      replacementCount: number;
+    };
     let pendingFrame: FrameHandle | null = null;
     let pendingSettledFrame: FrameHandle | null = null;
+    let pendingCleanup: PendingCleanup | null = null;
     type ProcessedContentState = { rowText: string; matchedText: string[] };
     const processedContent = new WeakMap<Element, ProcessedContentState>();
     const requestFrame = (callback: () => void): FrameHandle => typeof view.requestAnimationFrame === "function"
@@ -170,8 +196,8 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
       if (handle.kind === "animation-frame") view.cancelAnimationFrame(handle.id);
       else view.clearTimeout(handle.id);
     };
-    const clean = (trigger = "pane-mutation") => {
-      if (disposed || stopped || !root.contains(pane)) return;
+    const clean = (trigger = "pane-mutation", context?: BacklinksRefreshContext) => {
+      if (disposed || stopped || !root.contains(pane)) return null;
       cleanupRuns += 1;
       const rows = Array.from(pane.querySelectorAll(MATCH))
         .filter((row) => row.closest(PANE) === pane);
@@ -226,11 +252,11 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
         }]);
       }
       observer.takeRecords();
-      const cleanupTriggerSource = trigger.replace(/-(?:frame|settled)$/, "");
-      if (cleanupTriggerSource.startsWith("markdown-view-mode-change:")) {
+      const cleanupTriggerSource = triggerSource(trigger);
+      if (cleanupTriggerSource === "mode-switch") {
         replacementsAfterModeSwitch += replacements;
       }
-      if (cleanupTriggerSource === "row-pointerover" || cleanupTriggerSource === "row-focusin") {
+      if (cleanupTriggerSource === "pointer/focus") {
         replacementsAfterPointerFocus += replacements;
       }
       debugLog(() => ["[Smart Reference] Backlinks cleanup", {
@@ -248,29 +274,60 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
         textChangedRows,
         replacementExecutions,
         hiddenMarkerCount,
+        openedFilePath: context?.openedFilePath ?? null,
+        currentMarkdownViewMode: context?.currentMarkdownViewMode ?? null,
       }]);
+      return { replacements };
     };
-    const scheduleSettledCleanup = (trigger: string) => {
-      pendingReason = trigger;
+    const scheduleSettledCleanup = (
+      trigger: string,
+      context: BacklinksRefreshContext | undefined,
+      replacementCount: number,
+    ) => {
       cancelFrame(pendingFrame);
       cancelFrame(pendingSettledFrame);
       pendingSettledFrame = null;
+      const scheduled: PendingCleanup = { reason: trigger, context, replacementCount };
+      pendingCleanup = scheduled;
       pendingFrame = requestFrame(() => {
+        if (pendingCleanup !== scheduled) return;
         pendingFrame = null;
-        clean(`${pendingReason}-frame`);
+        const frameResult = clean(`${scheduled.reason}-frame`, scheduled.context);
+        scheduled.replacementCount += frameResult?.replacements ?? 0;
         pendingSettledFrame = requestFrame(() => {
+          if (pendingCleanup !== scheduled) return;
           pendingSettledFrame = null;
-          clean(`${pendingReason}-settled`);
-          pendingReason = "pane-mutation";
+          const result = clean(`${scheduled.reason}-settled`, scheduled.context);
+          scheduled.replacementCount += result?.replacements ?? 0;
+          if (triggerSource(scheduled.reason) === "file-open") {
+            debugLog(() => ["[Smart Reference] Backlinks file-open settled", {
+              openedFilePath: scheduled.context?.openedFilePath ?? null,
+              currentMarkdownViewMode: scheduled.context?.currentMarkdownViewMode ?? null,
+              cleanupScheduled: true,
+              replacementCount: scheduled.replacementCount,
+            }]);
+          }
+          pendingCleanup = null;
         });
       });
     };
-    const refresh = (trigger = "workspace-refresh") => {
-      const effectiveTrigger = trigger === "pane-mutation" && pendingReason !== "pane-mutation"
-        ? pendingReason
+    const refresh = (trigger = "workspace-refresh", context?: BacklinksRefreshContext) => {
+      const continuation = trigger === "pane-mutation" ? pendingCleanup : null;
+      const effectiveTrigger = continuation
+        ? continuation.reason
         : trigger;
-      clean(effectiveTrigger);
-      scheduleSettledCleanup(effectiveTrigger);
+      const effectiveContext = continuation
+        ? continuation.context
+        : context;
+      const previousReplacementCount = continuation
+        ? continuation.replacementCount
+        : 0;
+      const result = clean(effectiveTrigger, effectiveContext);
+      scheduleSettledCleanup(
+        effectiveTrigger,
+        effectiveContext,
+        previousReplacementCount + (result?.replacements ?? 0),
+      );
     };
     const observer = new Observer(() => refresh("pane-mutation"));
     observer.observe(pane, {
@@ -278,7 +335,7 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
       attributes: true, attributeFilter: ["class", "hidden", "style"],
     });
     debugLog(() => ["[Smart Reference] Backlinks observer attached", { target: pane, reason }]);
-    refresh(reason);
+    refresh(reason, context);
     const stop = () => {
       if (disposed) return;
       disposed = true;
@@ -301,7 +358,11 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     const cleanup = panes.get(pane);
     if (cleanup) cleanup.refresh(`row-${event.type}`);
   };
-  const reconcile = (reason: string, refreshExisting: boolean) => {
+  const reconcile = (
+    reason: string,
+    refreshExisting: boolean,
+    context?: BacklinksRefreshContext,
+  ) => {
     if (stopped) return;
     const current = new Set(root.querySelectorAll(PANE));
     if (root.matches(PANE)) current.add(root);
@@ -313,8 +374,8 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     }
     for (const pane of current) {
       const existing = panes.get(pane);
-      if (!existing) panes.set(pane, attachPane(pane, reason));
-      else if (refreshExisting) existing.refresh(reason);
+      if (!existing) panes.set(pane, attachPane(pane, reason, context));
+      else if (refreshExisting) existing.refresh(reason, context);
     }
     // Discovery never reapplies cleanup to unchanged panes for plugin-generated
     // mutations. Their own observers handle content; this avoids feedback loops.
@@ -334,7 +395,10 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     for (const cleanup of panes.values()) cleanup();
     panes.clear();
   };
-  return Object.assign(stop, { refresh: (reason = "workspace-refresh") => reconcile(reason, true) });
+  return Object.assign(stop, {
+    refresh: (reason = "workspace-refresh", context?: BacklinksRefreshContext) =>
+      reconcile(reason, true, context),
+  });
 }
 
 
@@ -402,6 +466,49 @@ export function createMarkdownViewModeWatcher(
 }
 
 
+/** Delay a file-open cleanup until the same-leaf view has rendered for two frames. */
+export function scheduleBacklinksCleanupAfterRender(
+  doc: Document,
+  context: BacklinksRefreshContext,
+  cleanup: () => void,
+): () => void {
+  const view = doc.defaultView;
+  if (!view) {
+    cleanup();
+    return () => undefined;
+  }
+  type FrameHandle = { id: number; kind: "animation-frame" | "timeout" };
+  const requestFrame = (callback: () => void): FrameHandle => typeof view.requestAnimationFrame === "function"
+    ? { id: view.requestAnimationFrame(() => callback()), kind: "animation-frame" }
+    : { id: view.setTimeout(callback, 0), kind: "timeout" };
+  const cancelFrame = (handle: FrameHandle | null) => {
+    if (!handle) return;
+    if (handle.kind === "animation-frame") view.cancelAnimationFrame(handle.id);
+    else view.clearTimeout(handle.id);
+  };
+  let cancelled = false;
+  let firstFrame: FrameHandle | null = null;
+  let settledFrame: FrameHandle | null = null;
+  debugLog(() => ["[Smart Reference] Backlinks file-open scheduled", {
+    openedFilePath: context.openedFilePath ?? null,
+    currentMarkdownViewMode: context.currentMarkdownViewMode ?? null,
+    cleanupScheduled: true,
+  }]);
+  firstFrame = requestFrame(() => {
+    firstFrame = null;
+    settledFrame = requestFrame(() => {
+      settledFrame = null;
+      if (!cancelled) cleanup();
+    });
+  });
+  return () => {
+    cancelled = true;
+    cancelFrame(firstFrame);
+    cancelFrame(settledFrame);
+  };
+}
+
+
 /** Backlinks may live in a workspace document other than the main editor window. */
 export function createBacklinksCleanupManager() {
   const documents = new Map<Document, { root: HTMLElement; cleanup: BacklinksCleanup }>();
@@ -420,10 +527,14 @@ export function createBacklinksCleanupManager() {
       documents.set(doc, { root, cleanup: startBacklinksCleanup(root) });
     },
     detach,
-    refresh(reason = "workspace-refresh"): void {
+    refresh(reason = "workspace-refresh", context?: BacklinksRefreshContext): void {
       if (stopped) return;
-      debugLog(() => ["[Smart Reference] Backlinks workspace refresh", { event: reason }]);
-      for (const { cleanup } of documents.values()) cleanup.refresh(reason);
+      debugLog(() => ["[Smart Reference] Backlinks workspace refresh", {
+        event: reason,
+        openedFilePath: context?.openedFilePath ?? null,
+        currentMarkdownViewMode: context?.currentMarkdownViewMode ?? null,
+      }]);
+      for (const { cleanup } of documents.values()) cleanup.refresh(reason, context);
     },
     destroy(): void {
       stopped = true;

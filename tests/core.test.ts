@@ -4,6 +4,7 @@ import {
   concealBacklinkMatch,
   createBacklinksCleanupManager,
   createMarkdownViewModeWatcher,
+  scheduleBacklinksCleanupAfterRender,
   startBacklinksCleanup,
 } from "../src/backlinks-cleanup.ts";
 import { createMetadataHidingField, findLivePreviewHiddenRanges } from "../src/metadata-hiding.ts";
@@ -1016,8 +1017,7 @@ test("Backlinks hover and focus refresh delayed rows and report lifecycle counte
     assert.ok(counters.some(({ matchedElements }) => Number(matchedElements) === 1));
     assert.ok(counters.some(({ replacements }) => Number(replacements) === 1));
     assert.ok(counters.some(({ cacheHits }) => Number(cacheHits) === 1));
-    assert.ok(counters.some(({ cleanupTriggerSource }) =>
-      cleanupTriggerSource === "row-pointerover" || cleanupTriggerSource === "row-focusin"));
+    assert.ok(counters.some(({ cleanupTriggerSource }) => cleanupTriggerSource === "pointer/focus"));
     assert.ok(counters.some(({ replacementsAfterPointerFocus }) => Number(replacementsAfterPointerFocus) >= 1));
   } finally {
     stop?.();
@@ -1121,8 +1121,7 @@ test("Markdown view mode transitions refresh Backlinks and report mode replaceme
     const counters = messages
       .filter(([label]) => label === "[Smart Reference] Backlinks cleanup")
       .map(([, details]) => details as Record<string, number | string>);
-    assert.ok(counters.some(({ cleanupTriggerSource }) =>
-      String(cleanupTriggerSource).startsWith('markdown-view-mode-change:')));
+    assert.ok(counters.some(({ cleanupTriggerSource }) => cleanupTriggerSource === 'mode-switch'));
     assert.ok(counters.some(({ replacementsAfterModeSwitch }) =>
       Number(replacementsAfterModeSwitch) >= 1));
   } finally {
@@ -1131,6 +1130,67 @@ test("Markdown view mode transitions refresh Backlinks and report mode replaceme
     console.debug = originalDebug;
     if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
     else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
+test("same-leaf Live Preview file-open cleans Backlinks after its delayed rerender", async () => {
+  const dom = new JSDOM('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[Target#^sr-a|file A alias]]</span></div></div></body></html>', { pretendToBeVisual: true });
+  const { document } = dom.window;
+  const originalDebug = console.debug;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const messages: unknown[][] = [];
+  const context = { openedFilePath: "A.md", currentMarkdownViewMode: "source" };
+  let manager: ReturnType<typeof createBacklinksCleanupManager> | undefined;
+  let cancelScheduled: (() => void) | undefined;
+  const frame = () => new Promise<void>((resolve) => dom.window.requestAnimationFrame(() => resolve()));
+  try {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => "true" },
+    });
+    console.debug = (...args) => { messages.push(args); };
+    manager = createBacklinksCleanupManager();
+    manager.attach(document);
+    for (let index = 0; index < 4; index += 1) await frame();
+    const row = document.querySelector('.search-result-file-match')!;
+    const matchedText = row.querySelector<HTMLElement>('.search-result-file-matched-text')!;
+    messages.length = 0;
+
+    dom.window.requestAnimationFrame(() => {
+      dom.window.requestAnimationFrame(() => {
+        matchedText.textContent = '[[Target#^sr-a|file A alias]]';
+      });
+    });
+    cancelScheduled = scheduleBacklinksCleanupAfterRender(document, context, () => {
+      manager!.refresh("file-open", context);
+    });
+    for (let index = 0; index < 7; index += 1) await frame();
+
+    assert.equal(document.querySelector('.search-result-file-match'), row);
+    assert.equal(visibleSnippetText(row), 'file A alias');
+    const scheduled = messages.find(([label]) =>
+      label === "[Smart Reference] Backlinks file-open scheduled")?.[1] as Record<string, unknown>;
+    assert.equal(scheduled.openedFilePath, "A.md");
+    assert.equal(scheduled.currentMarkdownViewMode, "source");
+    assert.equal(scheduled.cleanupScheduled, true);
+    const settled = messages.find(([label]) =>
+      label === "[Smart Reference] Backlinks file-open settled")?.[1] as Record<string, unknown>;
+    assert.equal(settled.openedFilePath, "A.md");
+    assert.equal(settled.currentMarkdownViewMode, "source");
+    assert.equal(settled.cleanupScheduled, true);
+    assert.equal(settled.replacementCount, 1);
+    const cleanup = messages.find(([label, details]) =>
+      label === "[Smart Reference] Backlinks cleanup"
+      && (details as Record<string, unknown>).cleanupTriggerSource === "file-open")?.[1] as Record<string, unknown>;
+    assert.equal(cleanup.openedFilePath, "A.md");
+    assert.equal(cleanup.currentMarkdownViewMode, "source");
+  } finally {
+    cancelScheduled?.();
+    manager?.destroy();
+    console.debug = originalDebug;
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    dom.window.close();
   }
 });
 
