@@ -14,8 +14,10 @@
 - [x] Test `#^sr-` link fragments, both marker formats, Source mode and exact highlights
 - [x] Replace the unreliable Live Preview fragment CSS mark with a CM6 range replacement
 - [x] Hide standalone generated block IDs in Reading View and Live Preview only
+- [x] Real Obsidian: generated target block IDs are hidden in both rendered views
+  while ordinary user-authored block IDs remain visible
 - [x] Restore generated Smart Reference aliases in Reading View without rewriting normal links
-- [ ] Real Obsidian: verify Reading View shows the alias instead of the internal target
+- [x] Real Obsidian: verify Reading View shows the alias instead of the internal target
 - [x] Render raw Smart Reference Wiki Links as aliases in Backlinks while preserving anchors
 - [x] Parse Smart Reference Backlinks split across nested rendered text nodes
 - [x] Add temporary before/after DOM, child-class, text-owner and rerender diagnostics
@@ -38,9 +40,9 @@
 - [x] Real Obsidian: hover/focus rerenders remain clean
 - [x] Real Obsidian: same-leaf switching and cross-file navigation remain clean
 - [x] Real Obsidian: Backlinks aliases and native click interaction verified
-- [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
+- [x] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [x] Real Obsidian: verify Backlinks after opening, switching and clicking notes
-- [ ] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
+- [x] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
 - [ ] Review integration branch; merge only with explicit authorization
 
 Historical milestone checklists below record work at the time and may contain

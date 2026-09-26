@@ -22,7 +22,7 @@
   generated `#^sr-[a-z0-9]+` target, it restores the alias on the rendered anchor.
 - Normal links, ambiguous associations and generated-looking links without a ref
   marker remain unchanged. Navigation attributes and highlight behavior are not
-  modified. Real-Obsidian validation of the repaired display is still required.
+  modified. Real-Obsidian validation confirmed that aliases render correctly.
 - The postprocessor also hides standalone generated `^sr-[a-z0-9]+` block IDs in
   target note rendering. It requires a matching line-ending ID in section source
   when available and leaves normal user IDs such as `^my-custom-id` visible.
@@ -44,7 +44,10 @@
 - The CM6 DOM fixture models alias internal-link spans and confirms exact source
   ranges, absence of the generated fragment, visible normal link fragments,
   Source-mode restoration, click association and exact-highlight coexistence.
-  Real-Obsidian validation is still required.
+  Real-Obsidian validation confirmed the same behavior: generated fragments,
+  metadata markers and block IDs are hidden in Live Preview; Source mode preserves
+  raw Markdown; ordinary user block IDs remain visible; and navigation plus exact
+  editor highlighting continue to work.
 
 ## Backlinks display status
 
@@ -119,13 +122,14 @@ for Backlinks selectors were deleted.
 - Real Vault: hover/focus rerenders remain clean.
 - Real Vault: same-leaf file switching and cross-file navigation remain clean.
 - Real Vault: Backlinks rows remain clickable and navigate correctly.
-- Real Vault: validate internal-link fragment and metadata concealment in Live
-  Preview, plus raw syntax in Source mode.
-- Real Vault: confirm Reading View displays the Smart Reference alias rather than
-  the generated target fragment.
-- Real Vault: confirm generated target block IDs are hidden in Reading View and
-  Live Preview while raw Source and normal user block IDs remain visible.
-- Real Vault: smoke-test navigation and exact highlighting in both views.
+- Real Vault: Live Preview hides internal-link fragments and metadata while Source
+  mode preserves the raw Markdown syntax.
+- Real Vault: Reading View displays the Smart Reference alias rather than the
+  generated target fragment.
+- Real Vault: generated target block IDs are hidden in Reading View and Live
+  Preview while normal user-authored block IDs remain visible.
+- Real Vault: Smart Reference creation, navigation and exact highlighting pass in
+  Reading View and Live Preview.
 
 Native fallback, ambiguous rendering, embedded-note source association, complex
 Markdown and the private `editor.cm` bridge remain the main compatibility limits.

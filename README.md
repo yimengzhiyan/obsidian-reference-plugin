@@ -1,11 +1,11 @@
 # Obsidian Reference Plugin
 
 Create native Wiki Block Links that return to the exact selected source text.
-The full Smart Reference workflow has been verified in real Obsidian: Reading
-View click resolution and exact DOM Range highlighting, plus Live Preview span
-click interception, refId resolution, navigation and CodeMirror exact highlighting.
-The branch is ready for integration review. Recent metadata concealment changes
-still need a final check in a real Obsidian Vault. It has not been merged into main.
+The tested V1 Smart Reference integration workflow has passed its full regression
+in real Obsidian: creation, Reading View and Live Preview rendering, navigation
+and exact highlighting, Source-mode raw Markdown, generated block-ID concealment,
+ordinary block-ID preservation, and Backlinks rendering/lifecycle behavior. The
+branch is ready for integration review and has not been merged into main.
 
 ## Development and installation
 
