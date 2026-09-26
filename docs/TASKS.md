@@ -43,7 +43,7 @@
 - [x] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [x] Real Obsidian: verify Backlinks after opening, switching and clicking notes
 - [x] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
-- [ ] Review integration branch; merge only with explicit authorization
+- [x] Complete final integration review and merge validated V1 into `main`
 
 Historical milestone checklists below record work at the time and may contain
 superseded runtime observations. Use the current checkpoint above for next actions.

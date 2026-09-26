@@ -1,7 +1,7 @@
 # CURRENT_STATUS
 
-**Branch:** `codex/live-preview-click-interception`
-**Phase:** Integration review; do not merge into main yet
+**Branch:** `main`
+**Phase:** V1 integrated; final integration review complete
 **Environment:** Linux/Codex; real Obsidian observations supplied by the user
 
 ## Implemented and user-verified

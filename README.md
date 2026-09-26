@@ -5,7 +5,7 @@ The tested V1 Smart Reference integration workflow has passed its full regressio
 in real Obsidian: creation, Reading View and Live Preview rendering, navigation
 and exact highlighting, Source-mode raw Markdown, generated block-ID concealment,
 ordinary block-ID preservation, and Backlinks rendering/lifecycle behavior. The
-branch is ready for integration review and has not been merged into main.
+validated V1 integration has been merged into `main`.
 
 ## Development and installation
 
