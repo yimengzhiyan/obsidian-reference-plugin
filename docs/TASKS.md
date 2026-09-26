@@ -31,6 +31,8 @@
 - [x] Delay explicit `file-open` cleanup for same-leaf Live Preview navigation
 - [x] Preserve file path/mode diagnostics through mutation and settled pane passes
 - [x] Regression-test same-leaf file-open followed by a delayed Backlinks rerender
+- [x] Allow genuine Backlinks panes nested inside Live Preview `.cm-editor`
+- [x] Test preserved raw text, native row clicks, normal editor text/Wiki Links and Reading View
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
@@ -796,6 +798,7 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Regression-test same row and matched-text element restoring identical raw syntax
 - [x] Handle same-leaf Live Preview file navigation through an explicit delayed `file-open` refresh
 - [x] Test that a post-file-open Backlinks rerender is cleaned with its causal diagnostics intact
+- [x] Replace the blanket `.cm-editor` exclusion with pane/row/matched-text scoping
 - [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
 

@@ -111,6 +111,9 @@ tokens within `.backlink-pane .search-result-file-match` rows. Smart Reference W
 Links are parsed only inside `.search-result-file-matched-text`; wrappers conceal
 `[[Target#^sr-id|` and `]]`, leaving only the alias. Reserved metadata is also
 matched across the row because Obsidian renders its comment in a sibling span.
+Eligibility is determined by the Backlinks pane/row/matched-text hierarchy. A
+genuine Backlinks pane remains eligible when Obsidian nests it inside a Live
+Preview `.cm-editor`; editor content outside `.backlink-pane` is never processed.
 Hidden wrappers preserve the original text nodes and the clickable row; no row
 `textContent`, Markdown or metadata is rewritten. The parser tolerates syntax split
 across nested highlight nodes, line breaks and zero-width rendering characters.

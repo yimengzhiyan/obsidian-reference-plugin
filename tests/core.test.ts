@@ -764,7 +764,7 @@ test("Backlinks hides split metadata and preserves text, links and event handler
   assert.equal(concealBacklinkMatch(snippet), 0);
 });
 
-test("Backlinks cleanup excludes editors, Reading View and global search", () => {
+test("Backlinks cleanup excludes editor, Reading View and global-search content outside panes", () => {
   const { document } = parseHTML('<html><body></body></html>');
   for (const containerClass of ['cm-editor', 'markdown-preview-view', 'search-view']) {
     const container = document.createElement('div');
@@ -775,6 +775,50 @@ test("Backlinks cleanup excludes editors, Reading View and global search", () =>
     assert.equal(concealBacklinkMatch(snippet), 0);
     assert.equal(snippet.innerHTML, '%%ref:keep%%');
   }
+});
+
+test("Backlinks nested inside a Live Preview editor remain eligible", () => {
+  const { document, window } = parseHTML(`<html><body>
+    <div class="cm-editor">
+      <div class="cm-line">[[Editor#^sr-editor|editor text]]</div>
+      <div class="backlink-pane">
+        <div class="search-result-file-match tappable live-row"><span class="search-result-file-matched-text">[[Target#^sr-test|alias]]</span></div>
+        <div class="search-result-file-match normal-row"><span class="search-result-file-matched-text">[[Target#^normal-id|normal alias]]</span></div>
+      </div>
+    </div>
+    <div class="markdown-preview-view">
+      <div class="backlink-pane">
+        <div class="search-result-file-match reading-row"><span class="search-result-file-matched-text">[[Target#^sr-reading|reading alias]]</span></div>
+      </div>
+    </div>
+  </body></html>`);
+  const editorLine = document.querySelector('.cm-line')!;
+  const editorMarkdown = editorLine.textContent;
+  const liveRow = document.querySelector('.live-row')!;
+  const liveText = liveRow.textContent;
+  let clicks = 0;
+  liveRow.addEventListener('click', () => clicks++);
+
+  assert.equal(concealBacklinkMatch(editorLine), 0);
+  assert.equal(concealBacklinkMatch(liveRow), 2);
+  assert.equal(visibleSnippetText(liveRow), 'alias');
+  assert.equal(liveRow.textContent, '[[Target#^sr-test|alias]]');
+  assert.equal(liveRow.textContent, liveText);
+  liveRow.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  assert.equal(clicks, 1);
+  assert.equal(editorLine.textContent, editorMarkdown);
+
+  const normalRow = document.querySelector('.normal-row')!;
+  const normalText = normalRow.textContent;
+  assert.equal(concealBacklinkMatch(normalRow), 0);
+  assert.equal(visibleSnippetText(normalRow), normalText);
+  assert.equal(normalRow.textContent, normalText);
+
+  const readingRow = document.querySelector('.reading-row')!;
+  const readingText = readingRow.textContent;
+  assert.equal(concealBacklinkMatch(readingRow), 2);
+  assert.equal(visibleSnippetText(readingRow), 'reading alias');
+  assert.equal(readingRow.textContent, readingText);
 });
 
 test("Backlinks preserves ordinary comments, partial markers and real DOM comments", () => {

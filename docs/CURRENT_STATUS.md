@@ -58,6 +58,12 @@
   nodes without replacing `row.textContent`, preserving the tappable row identity,
   listeners and native navigation. Multiple references and syntax split across
   nested highlight spans are covered. Normal Wiki Links remain unchanged.
+- Real Obsidian showed that Live Preview can render its in-document Backlinks pane
+  inside `.cm-editor`. The former blanket editor exclusion, inherited from the
+  initial broad snippet cleanup, is removed. Eligibility now requires an actual
+  `.search-result-file-match` inside `.backlink-pane`, and Wiki Link conversion
+  remains limited to that row's `.search-result-file-matched-text`. Ordinary editor
+  Markdown outside a Backlinks pane remains untouched.
 - The full-row DOM ownership/rerender snapshots used for diagnosis have been
   removed. The temporary matched-text log remains unconditional for the next Vault
   check and reports text, regex match and replacement preview.
@@ -102,7 +108,7 @@ for Backlinks selectors were deleted.
 
 ## Validation and remaining work
 
-- `npm test`: 76 passed
+- `npm test`: 77 passed
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed

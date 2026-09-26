@@ -1099,3 +1099,20 @@ overwriting file-open diagnostics. A newer file-open cancels the older pre-clean
 delay, and plugin unload cancels it as well. This specifically covers same-leaf
 navigation while keeping content-state caching, interaction handling, navigation
 and all renderers unchanged.
+
+
+## D-065 — Scope Backlinks cleanup by pane structure, not editor ancestry
+
+The first Backlinks cleanup in D-046 excluded every result under `.cm-editor` to
+avoid touching normal CodeMirror content. Real Obsidian later showed that an
+in-document Backlinks pane in Live Preview can itself be nested under `.cm-editor`.
+That ancestry check therefore rejects a genuine Backlinks row before parsing or
+diagnostics run.
+
+Remove the blanket editor-ancestor exclusion. A cleanup candidate must still be a
+`.search-result-file-match` inside `.backlink-pane`, and Smart Reference Wiki Link
+conversion remains restricted to `.search-result-file-matched-text` owned by that
+row. This structural scope admits Live Preview Backlinks without scanning arbitrary
+editor DOM. Preserve child text nodes, raw `textContent` and row event handlers;
+leave normal Wiki Links and Reading View behavior unchanged. No observer, timer,
+workspace event or parser behavior changes with this decision.

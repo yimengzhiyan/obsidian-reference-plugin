@@ -1,6 +1,6 @@
 import { debugLog } from "./debug.ts";
 
-// Obsidian's private Backlinks DOM: deliberately exclude global search and editors.
+// Obsidian's private Backlinks DOM: scope cleanup to actual pane result rows.
 const PANE = ".backlink-pane";
 const MATCH = ".search-result-file-match";
 const MATCHED_TEXT = ".search-result-file-matched-text";
@@ -68,7 +68,7 @@ function findUnescapedAliasSeparator(linktext: string): number {
 }
 const skipReason = (row: Element) => !row.matches(MATCH) ? "not-backlink-row"
   : !row.closest(PANE) ? "outside-backlink-pane"
-  : row.closest(".cm-editor") ? "inside-cm-editor" : null;
+  : null;
 
 function concealRanges(root: Element, ranges: HiddenTextRange[]): number {
   const doc = root.ownerDocument;
