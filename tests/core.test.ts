@@ -1015,10 +1015,54 @@ test("Backlinks hover and focus refresh delayed rows and report lifecycle counte
     assert.ok(counters.some(({ cleanupRuns }) => Number(cleanupRuns) >= 2));
     assert.ok(counters.some(({ matchedElements }) => Number(matchedElements) === 1));
     assert.ok(counters.some(({ replacements }) => Number(replacements) === 1));
-    assert.ok(counters.some(({ skippedAlreadyProcessedNodes }) => Number(skippedAlreadyProcessedNodes) === 1));
+    assert.ok(counters.some(({ cacheHits }) => Number(cacheHits) === 1));
     assert.ok(counters.some(({ cleanupTriggerSource }) =>
       cleanupTriggerSource === "row-pointerover" || cleanupTriggerSource === "row-focusin"));
     assert.ok(counters.some(({ replacementsAfterPointerFocus }) => Number(replacementsAfterPointerFocus) >= 1));
+  } finally {
+    stop?.();
+    console.debug = originalDebug;
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
+test("Backlinks reprocesses the same matched element when raw syntax is restored", async () => {
+  const { document } = parseHTML('<html><body><div class="backlink-pane"><div class="search-result-file-match tappable"><span class="search-result-file-matched-text">[[Target#^sr-same|same alias]]</span><span>&lt;!--smart-ref:same--&gt;</span></div></div></body></html>');
+  const originalDebug = console.debug;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const messages: unknown[][] = [];
+  let stop: (() => void) | undefined;
+  const settle = async () => {
+    for (let index = 0; index < 4; index += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  };
+  try {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => "true" },
+    });
+    console.debug = (...args) => { messages.push(args); };
+    stop = startBacklinksCleanup(document.body);
+    await settle();
+    const row = document.querySelector('.search-result-file-match')!;
+    const matchedText = row.querySelector<HTMLElement>('.search-result-file-matched-text')!;
+    messages.length = 0;
+
+    matchedText.textContent = '[[Target#^sr-same|same alias]]';
+    await settle();
+
+    assert.equal(document.querySelector('.search-result-file-match'), row);
+    assert.equal(row.querySelector('.search-result-file-matched-text'), matchedText);
+    assert.equal(visibleSnippetText(row), 'same alias');
+    const cacheLogs = messages
+      .filter(([label]) => label === "[Smart Reference] Backlinks cache")
+      .map(([, details]) => details as Record<string, unknown>);
+    assert.ok(cacheLogs.some(({ cacheMiss, textChanged, replacementExecuted }) =>
+      cacheMiss === true && textChanged === false && replacementExecuted === true));
+    assert.ok(cacheLogs.some(({ cacheHit, replacementExecuted }) =>
+      cacheHit === true && replacementExecuted === false));
   } finally {
     stop?.();
     console.debug = originalDebug;

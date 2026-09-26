@@ -26,6 +26,8 @@
 - [x] Count cleanup runs, matched elements, replacements and processed-row skips
 - [x] Detect MarkdownView preview/source transitions through getMode plus DOM/workspace checks
 - [x] Attribute replacement counters to mode-switch and pointer/focus trigger sources
+- [x] Remove permanent row-level cache skips and track row/matched-text content state
+- [x] Reprocess identical Smart Reference syntax when Obsidian removes hidden wrappers
 - [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
 - [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
@@ -788,6 +790,7 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Regression-test delayed hover/focus rewrites, lifecycle counters and no loops
 - [x] Refresh Backlinks after manual Reading View/Live Preview mode transitions
 - [x] Test workspace-detected and DOM-detected mode changes
+- [x] Regression-test same row and matched-text element restoring identical raw syntax
 - [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
 

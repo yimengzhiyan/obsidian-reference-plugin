@@ -1067,3 +1067,17 @@ without refreshing. Reuse the existing finite frame scheduler, and disconnect vi
 observers when leaves disappear or the plugin unloads. Include the causal trigger
 in cleanup diagnostics so replacements can be attributed to mode switches or row
 pointer/focus rendering.
+
+
+## D-063 — Cache Backlinks content state without skipping row processing
+
+Supersede D-060's cleaned-`innerHTML` early return. Obsidian can reuse the same row
+and matched-text elements while restoring identical raw Smart Reference syntax, so
+element identity and unchanged text do not prove that concealment remains applied.
+Store row text and each matched-text value in a WeakMap, but process every cleanup
+pass. Treat unchanged content as a cache hit only when the hidden wrappers remain
+valid and no new ranges were concealed. Missing or damaged wrappers, or changed
+content, cause the same elements to be processed again. Fully concealed ranges are
+already ignored by the text-node wrapper operation, so stable rows produce no DOM
+writes and cannot create an observer loop. Debug output records cache hit/miss,
+text changes and whether alias replacement executed.

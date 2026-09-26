@@ -103,10 +103,13 @@ function concealRanges(root: Element, ranges: HiddenTextRange[]): number {
   return count;
 }
 
+type ConcealBacklinkResult = { hiddenMarkerCount: number; replacements: number };
+
 /** Hide reserved metadata and collapse raw Smart Reference links to their aliases. */
-export function concealBacklinkMatch(row: Element): number {
-  if (skipReason(row)) return 0;
-  let count = 0;
+function concealBacklinkMatchWithResult(row: Element): ConcealBacklinkResult {
+  if (skipReason(row)) return { hiddenMarkerCount: 0, replacements: 0 };
+  let hiddenMarkerCount = 0;
+  let replacements = 0;
   const matchedTextSpans = Array.from(row.querySelectorAll(MATCHED_TEXT))
     .filter((span) => span.closest(MATCH) === row);
   for (const span of matchedTextSpans) {
@@ -122,13 +125,22 @@ export function concealBacklinkMatch(row: Element): number {
       matched,
       replaced,
     });
-    count += concealRanges(span, smartReferenceLinkRanges(textContent));
+    const ranges = smartReferenceLinkRanges(textContent);
+    for (let index = 0; index < ranges.length; index += 2) {
+      const hidden = concealRanges(span, ranges.slice(index, index + 2));
+      hiddenMarkerCount += hidden;
+      if (hidden > 0) replacements += 1;
+    }
   }
   // Metadata may be rendered in sibling spans outside the matched-text span.
   // Scan the row for those complete reserved tokens only; Wiki Link display
   // conversion remains strictly scoped to .search-result-file-matched-text.
-  count += concealRanges(row, metadataRanges(row.textContent ?? ""));
-  return count;
+  hiddenMarkerCount += concealRanges(row, metadataRanges(row.textContent ?? ""));
+  return { hiddenMarkerCount, replacements };
+}
+
+export function concealBacklinkMatch(row: Element): number {
+  return concealBacklinkMatchWithResult(row).hiddenMarkerCount;
 }
 
 export type BacklinksCleanup = (() => void) & { refresh(reason?: string): void };
@@ -148,7 +160,8 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
     type FrameHandle = { id: number; kind: "animation-frame" | "timeout" };
     let pendingFrame: FrameHandle | null = null;
     let pendingSettledFrame: FrameHandle | null = null;
-    const processedRows = new WeakMap<Element, string>();
+    type ProcessedContentState = { rowText: string; matchedText: string[] };
+    const processedContent = new WeakMap<Element, ProcessedContentState>();
     const requestFrame = (callback: () => void): FrameHandle => typeof view.requestAnimationFrame === "function"
       ? { id: view.requestAnimationFrame(() => callback()), kind: "animation-frame" }
       : { id: view.setTimeout(callback, 0), kind: "timeout" };
@@ -165,20 +178,52 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
       let hiddenMarkerCount = 0;
       let matchedElements = 0;
       let replacements = 0;
-      let skippedAlreadyProcessedNodes = 0;
+      let cacheHits = 0;
+      let cacheMisses = 0;
+      let textChangedRows = 0;
+      let replacementExecutions = 0;
       for (const row of rows) {
         const matchedTextSpans = Array.from(row.querySelectorAll(MATCHED_TEXT))
           .filter((span) => span.closest(MATCH) === row);
         matchedElements += matchedTextSpans.length;
-        if (processedRows.get(row) === row.innerHTML) {
-          skippedAlreadyProcessedNodes += 1;
-          continue;
-        }
-        replacements += matchedTextSpans.reduce((total, span) =>
-          total + smartReferenceLinkRanges(span.textContent ?? "").length / 2, 0);
-        reveal(row);
-        hiddenMarkerCount += concealBacklinkMatch(row);
-        processedRows.set(row, row.innerHTML);
+        const contentState: ProcessedContentState = {
+          rowText: row.textContent ?? "",
+          matchedText: matchedTextSpans.map((span) => span.textContent ?? ""),
+        };
+        const previousState = processedContent.get(row);
+        const textChanged = previousState !== undefined && (
+          previousState.rowText !== contentState.rowText
+          || previousState.matchedText.length !== contentState.matchedText.length
+          || previousState.matchedText.some((text, index) => text !== contentState.matchedText[index])
+        );
+        const wrappers = Array.from(row.querySelectorAll<HTMLElement>(`.${HIDDEN}`));
+        const wrappersIntact = wrappers.every((wrapper) => wrapper.hidden
+          && wrapper.style.getPropertyValue("display") === "none"
+          && wrapper.style.getPropertyPriority("display") === "important");
+        if (textChanged || !wrappersIntact) reveal(row);
+        const result = concealBacklinkMatchWithResult(row);
+        hiddenMarkerCount += result.hiddenMarkerCount;
+        replacements += result.replacements;
+        if (result.replacements > 0) replacementExecutions += 1;
+        const cacheHit = previousState !== undefined
+          && !textChanged
+          && wrappersIntact
+          && result.hiddenMarkerCount === 0;
+        if (cacheHit) cacheHits += 1;
+        else cacheMisses += 1;
+        if (textChanged) textChangedRows += 1;
+        processedContent.set(row, {
+          rowText: row.textContent ?? "",
+          matchedText: matchedTextSpans.map((span) => span.textContent ?? ""),
+        });
+        debugLog(() => ["[Smart Reference] Backlinks cache", {
+          reason: trigger,
+          row,
+          cacheHit,
+          cacheMiss: !cacheHit,
+          textChanged,
+          replacementExecuted: result.replacements > 0,
+        }]);
       }
       observer.takeRecords();
       const cleanupTriggerSource = trigger.replace(/-(?:frame|settled)$/, "");
@@ -198,7 +243,10 @@ export function startBacklinksCleanup(root: HTMLElement): BacklinksCleanup {
         replacements,
         replacementsAfterModeSwitch,
         replacementsAfterPointerFocus,
-        skippedAlreadyProcessedNodes,
+        cacheHits,
+        cacheMisses,
+        textChangedRows,
+        replacementExecutions,
         hiddenMarkerCount,
       }]);
     };
