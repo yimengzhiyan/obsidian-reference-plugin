@@ -59,14 +59,16 @@
   listeners and native navigation. Multiple references and syntax split across
   nested highlight spans are covered. Normal Wiki Links remain unchanged.
 - Real Obsidian showed that Live Preview can render its in-document Backlinks pane
-  inside `.cm-editor`. The former blanket editor exclusion, inherited from the
-  initial broad snippet cleanup, is removed. Eligibility now requires an actual
+  inside `.cm-editor`. The blanket editor exclusion introduced by `54aa199` remained
+  after `a9edbd9` structurally scoped cleanup to confirmed Backlinks rows. It caused
+  genuine Live Preview rows to return before cleanup and before matched-text logs.
+  That legacy exclusion is removed. Eligibility now requires an actual
   `.search-result-file-match` inside `.backlink-pane`, and Wiki Link conversion
   remains limited to that row's `.search-result-file-matched-text`. Ordinary editor
   Markdown outside a Backlinks pane remains untouched.
-- The full-row DOM ownership/rerender snapshots used for diagnosis have been
-  removed. The temporary matched-text log remains unconditional for the next Vault
-  check and reports text, regex match and replacement preview.
+- Full-row snapshots and the unconditional matched-text console log used during
+  diagnosis are removed. Retained Backlinks diagnostics use the runtime
+  `SMART_REFERENCE_DEBUG` switch.
 - Backlinks cleanup observes current `.backlink-pane` elements and reattaches on
   file, leaf and layout changes, so rebuilt panes and rows are cleaned again. Each
   mutation and workspace refresh receives an immediate cleanup plus two debounced
@@ -112,15 +114,17 @@ for Backlinks selectors were deleted.
 - `npm run typecheck`: passed
 - `npm run build`: passed
 - `git diff --check`: passed
+- Real Vault: Reading View and Live Preview Backlinks display only aliases and no
+  raw Smart Reference syntax.
+- Real Vault: hover/focus rerenders remain clean.
+- Real Vault: same-leaf file switching and cross-file navigation remain clean.
+- Real Vault: Backlinks rows remain clickable and navigate correctly.
 - Real Vault: validate internal-link fragment and metadata concealment in Live
   Preview, plus raw syntax in Source mode.
 - Real Vault: confirm Reading View displays the Smart Reference alias rather than
   the generated target fragment.
 - Real Vault: confirm generated target block IDs are hidden in Reading View and
   Live Preview while raw Source and normal user block IDs remain visible.
-- Real Vault: validate Backlinks aliases after opening, switching and clicking notes.
-- Real Vault: confirm generated Backlinks Wiki Links display only their aliases and
-  retain native backlink interaction.
 - Real Vault: smoke-test navigation and exact highlighting in both views.
 
 Native fallback, ambiguous rendering, embedded-note source association, complex

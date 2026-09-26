@@ -1103,11 +1103,12 @@ and all renderers unchanged.
 
 ## D-065 — Scope Backlinks cleanup by pane structure, not editor ancestry
 
-The first Backlinks cleanup in D-046 excluded every result under `.cm-editor` to
-avoid touching normal CodeMirror content. Real Obsidian later showed that an
-in-document Backlinks pane in Live Preview can itself be nested under `.cm-editor`.
-That ancestry check therefore rejects a genuine Backlinks row before parsing or
-diagnostics run.
+The first Backlinks cleanup in commit `54aa199` (D-046) excluded every result under
+`.cm-editor` to avoid touching normal CodeMirror content. Commit `a9edbd9` later
+restricted cleanup to the confirmed Backlinks pane/row/matched-text hierarchy but
+retained that legacy ancestry check. Real Obsidian showed that an in-document
+Backlinks pane in Live Preview is itself nested under `.cm-editor`, so every genuine
+Live Preview row was rejected before parsing or diagnostics ran.
 
 Remove the blanket editor-ancestor exclusion. A cleanup candidate must still be a
 `.search-result-file-match` inside `.backlink-pane`, and Smart Reference Wiki Link
@@ -1116,3 +1117,9 @@ row. This structural scope admits Live Preview Backlinks without scanning arbitr
 editor DOM. Preserve child text nodes, raw `textContent` and row event handlers;
 leave normal Wiki Links and Reading View behavior unchanged. No observer, timer,
 workspace event or parser behavior changes with this decision.
+
+Real-Vault verification passed in both Reading View and Live Preview, including
+hover/focus rerenders, same-leaf switching, cross-file navigation and native
+Backlinks row clicks. The temporary unconditional matched-text console diagnostic
+is therefore removed; lifecycle and cleanup diagnostics remain available through
+the runtime `SMART_REFERENCE_DEBUG` switch.

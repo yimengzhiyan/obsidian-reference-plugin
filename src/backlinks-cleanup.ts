@@ -114,17 +114,6 @@ function concealBacklinkMatchWithResult(row: Element): ConcealBacklinkResult {
     .filter((span) => span.closest(MATCH) === row);
   for (const span of matchedTextSpans) {
     const textContent = span.textContent ?? "";
-    const pattern = /\[\[[^\]]*#\^sr-[a-z0-9]+\|([^\]]*)\]\]/g;
-    const matched = pattern.test(textContent);
-    pattern.lastIndex = 0;
-    const replaced = textContent.replace(pattern, "$1");
-    console.log("[Smart Reference] Backlinks matched text debug", {
-      count: matchedTextSpans.length,
-      innerText: (span as HTMLElement).innerText,
-      textContent,
-      matched,
-      replaced,
-    });
     const ranges = smartReferenceLinkRanges(textContent);
     for (let index = 0; index < ranges.length; index += 2) {
       const hidden = concealRanges(span, ranges.slice(index, index + 2));

@@ -9,7 +9,7 @@
 - [x] Keep opt-in runtime `SMART_REFERENCE_DEBUG` logging
 - [x] Delete the three empty untracked Backlinks investigation files
 - [x] Update README and current handoff status
-- [x] Confirm final test, typecheck, build and diff checks (71 tests)
+- [x] Confirm final test, typecheck, build and diff checks (77 tests)
 - [x] Replace failed `.cm-blockid` bridge with internal Wiki Link source ranges
 - [x] Test `#^sr-` link fragments, both marker formats, Source mode and exact highlights
 - [x] Replace the unreliable Live Preview fragment CSS mark with a CM6 range replacement
@@ -33,9 +33,13 @@
 - [x] Regression-test same-leaf file-open followed by a delayed Backlinks rerender
 - [x] Allow genuine Backlinks panes nested inside Live Preview `.cm-editor`
 - [x] Test preserved raw text, native row clicks, normal editor text/Wiki Links and Reading View
-- [ ] Real Obsidian: verify Backlinks aliases and native backlink interaction
+- [x] Remove the unconditional matched-text console diagnostic after validation
+- [x] Real Obsidian: Reading View and Live Preview Backlinks are clean
+- [x] Real Obsidian: hover/focus rerenders remain clean
+- [x] Real Obsidian: same-leaf switching and cross-file navigation remain clean
+- [x] Real Obsidian: Backlinks aliases and native click interaction verified
 - [ ] Real Obsidian: verify Live Preview hides link fragments/markers and Source shows raw Markdown
-- [ ] Real Obsidian: verify Backlinks after opening, switching and clicking notes
+- [x] Real Obsidian: verify Backlinks after opening, switching and clicking notes
 - [ ] Real Obsidian: confirm Reading View and Live Preview exact highlight regression
 - [ ] Review integration branch; merge only with explicit authorization
 
@@ -799,7 +803,7 @@ adjacency by design; the native Wiki Block Link remains valid.
 - [x] Handle same-leaf Live Preview file navigation through an explicit delayed `file-open` refresh
 - [x] Test that a post-file-open Backlinks rerender is cleaned with its causal diagnostics intact
 - [x] Replace the blanket `.cm-editor` exclusion with pane/row/matched-text scoping
-- [ ] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
+- [x] Real Vault: open/switch notes, repeated backlink clicks and pane refresh
 - [ ] Real Vault: navigation and exact highlighting remain intact
 
 

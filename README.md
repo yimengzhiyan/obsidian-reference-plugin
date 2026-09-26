@@ -114,6 +114,9 @@ matched across the row because Obsidian renders its comment in a sibling span.
 Eligibility is determined by the Backlinks pane/row/matched-text hierarchy. A
 genuine Backlinks pane remains eligible when Obsidian nests it inside a Live
 Preview `.cm-editor`; editor content outside `.backlink-pane` is never processed.
+The final root cause was a legacy `.cm-editor` exclusion introduced in `54aa199`:
+it remained after `a9edbd9` narrowed cleanup to the confirmed Backlinks structure,
+so genuine Live Preview rows were rejected before cleanup or diagnostics ran.
 Hidden wrappers preserve the original text nodes and the clickable row; no row
 `textContent`, Markdown or metadata is rewritten. The parser tolerates syntax split
 across nested highlight nodes, line breaks and zero-width rendering characters.
@@ -139,6 +142,8 @@ covered. Workspace pop-out documents use the same scoped cleanup.
 Optional debug logs report workspace events, observer attachment and disconnection,
 matched row counts, hidden marker counts and normalized `file-open`,
 `active-leaf-change`, `mode-switch` and `mutation` trigger sources.
+Real-Vault validation passed for Reading View and Live Preview Backlinks, hover and
+focus rerenders, same-leaf switching, cross-file navigation and native row clicks.
 For Backlinks troubleshooting, enable the runtime debug switch and inspect
 `Backlinks cleanup` counts. If a row still leaks, capture its DOM from the Vault;
 the large temporary row snapshots have been removed from normal builds.
